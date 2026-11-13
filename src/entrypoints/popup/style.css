@@ -302,11 +302,11 @@ body {
   color: #71717a;
 }
 
-.reviewed-pill {
+.visited-pill {
   font-size: 10px;
   font-weight: 600;
-  color: #047857;
-  background-color: #ecfdf5;
+  color: #0369a1;
+  background-color: #f0f9ff;
   padding: 1px 5px;
   border-radius: 4px;
 }

@@ -10,7 +10,7 @@ import {
   setBridgeEnabled,
 } from '../../domain/bridgeStorage';
 import { buildModoodocSearchUrl } from '../../domain/modoodocUrl';
-import type { RecentHospitalRecord } from '../../types/place';
+import type { OpenModoodocHospitalRequest, RecentHospitalRecord } from '../../types/place';
 
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp);
@@ -89,14 +89,36 @@ export function PopupApp(): React.JSX.Element {
   };
 
   const handleOpenHistoryItem = async (record: RecentHospitalRecord) => {
-    const updated = await markHospitalClicked({
-      name: record.name,
-      department: record.department,
+    if (record.summary?.detailUrl) {
+      const updated = await markHospitalClicked({
+        name: record.name,
+        department: record.department,
+        regionHint: record.regionHint,
+      });
+      setRecentHospitals(updated);
+      await openExternalTab(record.summary.detailUrl);
+      return;
+    }
+
+    const req: OpenModoodocHospitalRequest = {
+      type: 'OPEN_MODOODOC_HOSPITAL',
+      hospitalName: record.name,
       regionHint: record.regionHint,
-    });
-    setRecentHospitals(updated);
-    const targetUrl = record.summary?.detailUrl ?? record.searchUrl;
-    await openExternalTab(targetUrl);
+      department: record.department,
+    };
+
+    try {
+      await browser.runtime.sendMessage(req);
+      await loadState();
+    } catch {
+      const updated = await markHospitalClicked({
+        name: record.name,
+        department: record.department,
+        regionHint: record.regionHint,
+      });
+      setRecentHospitals(updated);
+      await openExternalTab(record.searchUrl);
+    }
   };
 
   const handleRemoveItem = async (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
@@ -218,7 +240,7 @@ export function PopupApp(): React.JSX.Element {
                       <span>{item.regionHint || '지역 정보 없음'}</span>
                       <span>·</span>
                       <span>{formatRelativeTime(item.viewedAt)}</span>
-                      {item.clickedModoodoc && <span className="reviewed-pill">리뷰 확인함</span>}
+                      {item.clickedModoodoc && <span className="visited-pill">모두닥 열어봄</span>}
                     </div>
                     {summary !== null && (
                       <div className="history-summary-row">

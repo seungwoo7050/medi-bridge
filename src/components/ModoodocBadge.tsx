@@ -7,6 +7,7 @@ import type {
   FetchModoodocSummaryRequest,
   FetchModoodocSummaryResponse,
   ModoodocHospitalSummary,
+  OpenModoodocHospitalRequest,
 } from '../types/place';
 
 export interface ModoodocBadgeProps {
@@ -105,8 +106,28 @@ export function ModoodocBadge({
           className="modoodoc-bridge-badge is-loading"
           title={`'${hospitalName}' 모두닥 실방문자 영수증 리뷰 검색 (새 탭)`}
           aria-label={`${hospitalName} 모두닥 가격·리뷰 확인 중`}
-          onClick={() => {
-            onSelect?.();
+          onClick={(event) => {
+            const isPlainLeftClick =
+              event.button === 0 &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.shiftKey &&
+              !event.altKey;
+            if (!isPlainLeftClick) {
+              onSelect?.();
+              return;
+            }
+            event.preventDefault();
+            const req: OpenModoodocHospitalRequest = {
+              type: 'OPEN_MODOODOC_HOSPITAL',
+              hospitalName,
+              regionHint,
+              department,
+            };
+            void browser.runtime.sendMessage(req).catch(() => {
+              onSelect?.();
+              window.open(searchUrl, '_blank', 'noopener,noreferrer');
+            });
           }}
         >
           <span className="modoodoc-bridge-icon" aria-hidden="true">

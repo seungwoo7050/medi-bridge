@@ -295,16 +295,21 @@
   opacity: 0.8;
 }
 
-.modoodoc-list-chip.is-reviewed {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #15803d;
+.modoodoc-list-chip.is-visited {
+  background-color: #faf5ff;
+  border-color: #ddd6fe;
+  color: #5b36f2;
 }
 
-.modoodoc-list-chip.is-reviewed:hover {
-  background-color: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
+.modoodoc-list-chip.is-visited:hover {
+  background-color: #ede9fe;
+  border-color: #c4b5fd;
+  color: #4338ca;
+}
+
+.modoodoc-list-chip.is-opening {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .modoodoc-list-chip-check {

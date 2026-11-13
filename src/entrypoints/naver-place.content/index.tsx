@@ -59,14 +59,15 @@ export default defineContentScript({
     const renderChipIntoRoot = (root: ReactDOM.Root, item: ExtractedSearchListHospital) => {
       const hospitalKey = buildHospitalKey(item.name, item.regionHint);
       const historyRecord = recentHospitalsMap.get(hospitalKey);
-      const isReviewed = historyRecord?.clickedModoodoc === true;
+      const isVisited = historyRecord?.clickedModoodoc === true;
       const detailUrl = historyRecord?.summary?.detailUrl ?? null;
 
       root.render(
         <ModoodocListChip
           hospitalName={item.name}
           regionHint={item.regionHint}
-          isReviewed={isReviewed}
+          department={item.matchedDepartment}
+          isVisited={isVisited}
           detailUrl={detailUrl}
           onSelect={() => {
             void markHospitalClicked({

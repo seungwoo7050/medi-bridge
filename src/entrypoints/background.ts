@@ -4,6 +4,7 @@ import { parseModoodocSearchHtml } from '../adapters/modoodocSearchParser';
 import {
   attachSummaryToRecentHospital,
   getCachedHospitalSummary,
+  markHospitalClicked,
   setCachedHospitalSummary,
 } from '../domain/bridgeStorage';
 import {
@@ -12,7 +13,12 @@ import {
   extractRegionHintFromAddress,
   normalizeHospitalName,
 } from '../domain/modoodocUrl';
-import type { FetchModoodocSummaryRequest, FetchModoodocSummaryResponse } from '../types/place';
+import type {
+  FetchModoodocSummaryRequest,
+  FetchModoodocSummaryResponse,
+  OpenModoodocHospitalRequest,
+  OpenModoodocHospitalResponse,
+} from '../types/place';
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -24,6 +30,18 @@ function isFetchModoodocSummaryRequest(value: unknown): value is FetchModoodocSu
   }
   return (
     value.type === 'FETCH_MODOODOC_SUMMARY' &&
+    typeof value.hospitalName === 'string' &&
+    typeof value.regionHint === 'string' &&
+    typeof value.department === 'string'
+  );
+}
+
+function isOpenModoodocHospitalRequest(value: unknown): value is OpenModoodocHospitalRequest {
+  if (!isRecordObject(value)) {
+    return false;
+  }
+  return (
+    value.type === 'OPEN_MODOODOC_HOSPITAL' &&
     typeof value.hospitalName === 'string' &&
     typeof value.regionHint === 'string' &&
     typeof value.department === 'string'
@@ -84,6 +102,28 @@ async function fetchHospitalSummary(
   return task;
 }
 
+async function openHospitalInModoodoc(
+  req: OpenModoodocHospitalRequest,
+): Promise<OpenModoodocHospitalResponse> {
+  await markHospitalClicked({
+    name: req.hospitalName,
+    department: req.department,
+    regionHint: req.regionHint,
+  });
+
+  const resolved = await fetchHospitalSummary({
+    type: 'FETCH_MODOODOC_SUMMARY',
+    hospitalName: req.hospitalName,
+    regionHint: req.regionHint,
+    department: req.department,
+  });
+
+  const targetUrl =
+    resolved.summary?.detailUrl ?? buildModoodocSearchUrl(req.hospitalName, req.regionHint);
+  await browser.tabs.create({ url: targetUrl });
+  return { ok: true, targetUrl };
+}
+
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     if (isFetchModoodocSummaryRequest(message)) {
@@ -96,6 +136,24 @@ export default defineBackground(() => {
         });
       return true;
     }
+
+    if (isOpenModoodocHospitalRequest(message)) {
+      openHospitalInModoodoc(message)
+        .then((response) => {
+          sendResponse(response);
+        })
+        .catch(async () => {
+          const fallbackUrl = buildModoodocSearchUrl(message.hospitalName, message.regionHint);
+          try {
+            await browser.tabs.create({ url: fallbackUrl });
+          } catch {
+            // ignore tab creation fallback failure
+          }
+          sendResponse({ ok: false, targetUrl: fallbackUrl });
+        });
+      return true;
+    }
+
     return false;
   });
 });

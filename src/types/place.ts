@@ -97,6 +97,18 @@ export interface FetchModoodocSummaryResponse {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
+export interface OpenModoodocHospitalRequest {
+  readonly type: 'OPEN_MODOODOC_HOSPITAL';
+  readonly hospitalName: string;
+  readonly regionHint: string;
+  readonly department: string;
+}
+
+export interface OpenModoodocHospitalResponse {
+  readonly ok: boolean;
+  readonly targetUrl: string;
+}
+
 export interface BridgeStorageState {
   readonly bridgeEnabled: boolean;
   readonly recentHospitals: readonly RecentHospitalRecord[];

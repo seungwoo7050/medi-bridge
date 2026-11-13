@@ -9,6 +9,10 @@ const MODOODOC_DETAIL_SLUG = '강남케이안과의원-서울-역삼동';
 const MODOODOC_DETAIL_URL = `https://www.modoodoc.com/hospital/86566/${encodeURIComponent(
   MODOODOC_DETAIL_SLUG,
 )}`;
+const GS_DETAIL_SLUG = '지에스안과의원-서울-역삼동';
+const GS_DETAIL_URL = `https://www.modoodoc.com/hospital/91234/${encodeURIComponent(
+  GS_DETAIL_SLUG,
+)}`;
 
 const MODOODOC_SSR_DATA = {
   props: {
@@ -28,6 +32,17 @@ const MODOODOC_SSR_DATA = {
                     numOfReview: 20,
                     totalScore: 8.6,
                     treatments: [{ name: '인공눈물 처방', count: 4 }],
+                    treatmentPrices: [],
+                    hiraTreatmentPrices: [],
+                  },
+                  {
+                    id: 91234,
+                    name: '지에스안과의원',
+                    slug: GS_DETAIL_SLUG,
+                    address: '서울 강남구 역삼1동',
+                    numOfReview: 25,
+                    totalScore: 9.4,
+                    treatments: [{ name: '라섹', count: 12 }],
                     treatmentPrices: [],
                     hiraTreatmentPrices: [],
                   },
@@ -342,7 +357,20 @@ test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Po
       timeout: 5_000,
     });
 
-    // 4. 카드 [리뷰 보기 ↗] 클릭 시 상세 페이지 직결 + Popup/목록 칩 모두 '리뷰 확인함' 실시간 전환
+    // 4. 미열람 검색 목록 칩 클릭 시 상세 페이지 직결 + 방문 상태('모두닥 리뷰' 유지 / Popup '모두닥 열어봄') 검증
+    const adChip = searchFrame.locator(
+      '[data-testid="ad-hospital"] modoodoc-naver-list-chip a.modoodoc-list-chip',
+    );
+    const [gsTab] = await Promise.all([context.waitForEvent('page'), adChip.click()]);
+    await gsTab.waitForLoadState('domcontentloaded');
+    expect(gsTab.url()).toBe(GS_DETAIL_URL);
+
+    await expect(adChip).toHaveClass(/is-visited/, { timeout: 5_000 });
+    await expect(adChip).toContainText('모두닥 리뷰');
+    await expect(adChip).not.toContainText('리뷰 확인함');
+    expect(await adChip.getAttribute('href')).toBe(GS_DETAIL_URL);
+
+    // 5. 카드 [리뷰 보기 ↗] 클릭 시 상세 페이지 직결 + Popup/목록 칩 방문 표시 실시간 전환
     const [newTab] = await Promise.all([
       context.waitForEvent('page'),
       entryFrame.locator('modoodoc-naver-bridge a.modoodoc-card-cta').click(),
@@ -350,12 +378,14 @@ test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Po
     await newTab.waitForLoadState('domcontentloaded');
     expect(newTab.url()).toBe(MODOODOC_DETAIL_URL);
 
-    await expect(popupPage.locator('.reviewed-pill')).toContainText(['리뷰 확인함']);
+    await expect(popupPage.locator('.visited-pill').first()).toContainText('모두닥 열어봄');
+    await expect(popupPage.locator('text=리뷰 확인함')).toHaveCount(0);
+
     const organicChip = searchFrame.locator(
       '[data-testid="organic-hospital"] modoodoc-naver-list-chip a.modoodoc-list-chip',
     );
-    await expect(organicChip).toHaveClass(/is-reviewed/, { timeout: 5_000 });
-    await expect(organicChip).toContainText('리뷰 확인함');
+    await expect(organicChip).toHaveClass(/is-visited/, { timeout: 5_000 });
+    await expect(organicChip).toContainText('모두닥 리뷰');
     expect(await organicChip.getAttribute('href')).toBe(MODOODOC_DETAIL_URL);
   } finally {
     await context.close();
