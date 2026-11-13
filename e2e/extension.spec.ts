@@ -3,7 +3,92 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { type BrowserContext, chromium, expect, test } from '@playwright/test';
 
-const EXTENSION_PATH = resolve(import.meta.dirname, '../.output/chrome-mv3');
+const EXTENSION_PATH = resolve(import.meta.dirname, '../output/chrome-mv3');
+
+const MODOODOC_DETAIL_SLUG = '강남케이안과의원-서울-역삼동';
+const MODOODOC_DETAIL_URL = `https://www.modoodoc.com/hospital/86566/${encodeURIComponent(
+  MODOODOC_DETAIL_SLUG,
+)}`;
+
+const MODOODOC_SSR_DATA = {
+  props: {
+    pageProps: {
+      dehydratedState: {
+        queries: [
+          {
+            queryKey: ['hospitalsWithQuery', { searchQuery: '서울 강남구 강남케이안과의원' }],
+            state: {
+              data: {
+                hospitals: [
+                  {
+                    id: 4550,
+                    name: 'YK안과의원',
+                    slug: 'yk안과의원-서울-삼성동',
+                    address: '서울 강남구 삼성2동',
+                    numOfReview: 20,
+                    totalScore: 8.6,
+                    treatments: [{ name: '인공눈물 처방', count: 4 }],
+                    treatmentPrices: [],
+                    hiraTreatmentPrices: [],
+                  },
+                  {
+                    id: 86566,
+                    name: '강남케이안과의원',
+                    slug: MODOODOC_DETAIL_SLUG,
+                    address: '서울 강남구 역삼1동',
+                    numOfReview: 10,
+                    totalScore: 10,
+                    treatments: [
+                      { name: '스마일라식', count: 9 },
+                      { name: '인공눈물 처방', count: 1 },
+                    ],
+                    treatmentPrices: [
+                      {
+                        treatmentGroup: { name: '시력교정술 검진' },
+                        normalPrice: { lowestPrice: 0, highestPrice: 0 },
+                        eventPrice: null,
+                        specialPrice: null,
+                      },
+                      {
+                        treatmentGroup: { name: '스마일라식' },
+                        normalPrice: { lowestPrice: 3500000, highestPrice: 3500000 },
+                        eventPrice: { lowestPrice: 2090000, highestPrice: 2090000 },
+                        specialPrice: null,
+                      },
+                      {
+                        treatmentGroup: { name: '렌즈삽입술' },
+                        normalPrice: { lowestPrice: 6000000, highestPrice: 6000000 },
+                        eventPrice: { lowestPrice: 4800000, highestPrice: 4800000 },
+                        specialPrice: null,
+                      },
+                      {
+                        treatmentGroup: { name: '아벨리노 DNA 검사' },
+                        normalPrice: { lowestPrice: 100000, highestPrice: 100000 },
+                        eventPrice: null,
+                        specialPrice: null,
+                      },
+                    ],
+                    hiraTreatmentPrices: [],
+                  },
+                ],
+                premiumAdHospitals: [],
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+};
+
+const MODOODOC_SEARCH_HTML = `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <script id="__NEXT_DATA__" type="application/json">${JSON.stringify(MODOODOC_SSR_DATA)}</script>
+  </head>
+  <body><h1>모두닥 검색</h1></body>
+</html>`;
 
 const SEARCH_IFRAME_HTML = `<!doctype html>
 <html lang="ko">
@@ -110,7 +195,7 @@ async function resolveExtensionId(context: BrowserContext): Promise<string> {
   return extId;
 }
 
-test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히스토리 및 실시간 토글 동작을 검증한다', async () => {
+test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Popup 비교함 및 실시간 토글을 검증한다', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'modoodoc-e2e-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     channel: 'chromium',
@@ -137,6 +222,45 @@ test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히�
       });
     });
 
+    await context.route('https://www.modoodoc.com/**', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/hospitals/query-search')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html; charset=utf-8',
+          body: MODOODOC_SEARCH_HTML,
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: '<html><body><h1>강남케이안과의원 상세</h1></body></html>',
+      });
+    });
+
+    let [bgWorker] = context.serviceWorkers();
+    if (!bgWorker) {
+      bgWorker = await context.waitForEvent('serviceworker', { timeout: 10_000 });
+    }
+    await bgWorker.evaluate((mockHtml: string) => {
+      const origFetch = globalThis.fetch.bind(globalThis);
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.startsWith('https://www.modoodoc.com/hospitals/query-search')) {
+          return new Response(mockHtml, {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }
+        return origFetch(input, init);
+      };
+    }, MODOODOC_SEARCH_HTML);
+
     const mapPage = await context.newPage();
     await mapPage.goto('https://map.naver.com/p/search/test', {
       waitUntil: 'load',
@@ -162,7 +286,7 @@ test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히�
       return;
     }
 
-    // 1. 검색 목록: 병원 2건(광고+일반)에만 미니 칩 마운트, 동물병원·카페는 미노출
+    // 1. 검색 목록: 병원 2건에만 Ghost 미니 칩 마운트, 동물병원·카페 미노출
     const listChipLocator = searchFrame.locator('modoodoc-naver-list-chip');
     await expect(listChipLocator).toHaveCount(2, { timeout: 10_000 });
     await expect(
@@ -172,21 +296,22 @@ test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히�
       searchFrame.locator('[data-testid="cafe-place"] modoodoc-naver-list-chip'),
     ).toHaveCount(0);
 
-    // 2. 상세 패널: 퍼플 배지 마운트 및 정확한 모두닥 검색 URL 확인
+    // 2. 상세 패널: 3단 컴팩트 브릿지 카드 마운트, 가격·시술·상세 페이지 딥링크 검증
     const entryBadgeHost = entryFrame.locator('modoodoc-naver-bridge');
     await expect(entryBadgeHost).toHaveCount(1, { timeout: 10_000 });
 
-    const badgeHref = await entryBadgeHost.evaluate((host) => {
-      const link = host.shadowRoot?.querySelector('a.modoodoc-bridge-badge');
-      return link?.getAttribute('href') ?? '';
-    });
-    const parsedUrl = new URL(badgeHref);
-    expect(parsedUrl.origin + parsedUrl.pathname).toBe(
-      'https://www.modoodoc.com/hospitals/query-search',
-    );
-    expect(parsedUrl.searchParams.get('search_query')).toBe('서울 강남구 강남케이안과의원');
+    const entryCard = entryFrame.locator('modoodoc-naver-bridge .modoodoc-bridge-card');
+    await expect(entryCard).toBeVisible({ timeout: 10_000 });
+    await expect(entryCard.locator('.modoodoc-card-score')).toContainText('10.0');
+    await expect(entryCard.locator('.modoodoc-card-reviews')).toContainText('10건');
+    await expect(entryCard.locator('.modoodoc-card-tags')).toContainText('#스마일라식');
+    await expect(entryCard.locator('.modoodoc-card-prices')).toContainText('209만원');
+    await expect(entryCard.locator('.modoodoc-card-more')).toContainText('외 1개');
 
-    // 3. Popup에서 최근 본 병원 기록 확인 및 토글 OFF 시 실시간 제거 검증
+    const ctaHref = await entryCard.locator('a.modoodoc-card-cta').getAttribute('href');
+    expect(ctaHref).toBe(MODOODOC_DETAIL_URL);
+
+    // 3. Popup 비교함에서 평점·대표 시술 가격 요약 및 토글 OFF/ON 검증
     const extId = await resolveExtensionId(context);
     const popupPage = await context.newPage();
     await popupPage.goto(`chrome-extension://${extId}/popup.html`, {
@@ -194,13 +319,14 @@ test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히�
     });
 
     await expect(popupPage.locator('.history-name')).toContainText(['강남케이안과의원']);
+    await expect(popupPage.locator('.history-summary-row')).toContainText('10.0');
+    await expect(popupPage.locator('.history-summary-row')).toContainText('스마일라식 209만원');
 
     const toggleSwitch = popupPage.getByRole('switch');
     await expect(toggleSwitch).toHaveAttribute('aria-checked', 'true');
     await toggleSwitch.click();
     await expect(toggleSwitch).toHaveAttribute('aria-checked', 'false');
 
-    // 새로고침 없이 열린 네이버 지도 탭의 배지와 미니 칩이 즉시 제거되어야 함
     await expect(entryFrame.locator('modoodoc-naver-bridge')).toHaveCount(0, {
       timeout: 5_000,
     });
@@ -208,29 +334,29 @@ test('네이버 지도 이중 프레임 배지·미니 칩 마운트, Popup 히�
       timeout: 5_000,
     });
 
-    // 다시 켜면 즉시 재마운트
     await toggleSwitch.click();
-    await expect(entryFrame.locator('modoodoc-naver-bridge')).toHaveCount(1, {
+    await expect(entryFrame.locator('modoodoc-naver-bridge .modoodoc-bridge-card')).toHaveCount(1, {
       timeout: 5_000,
     });
     await expect(searchFrame.locator('modoodoc-naver-list-chip')).toHaveCount(2, {
       timeout: 5_000,
     });
 
-    // 배지 클릭 시 팝업 히스토리에 '리뷰 확인함' 상태 반영 확인
-    await context.route('https://www.modoodoc.com/**', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html; charset=utf-8',
-        body: '<html><body><h1>모두닥</h1></body></html>',
-      });
-    });
+    // 4. 카드 [리뷰 보기 ↗] 클릭 시 상세 페이지 직결 + Popup/목록 칩 모두 '리뷰 확인함' 실시간 전환
     const [newTab] = await Promise.all([
       context.waitForEvent('page'),
-      entryFrame.locator('modoodoc-naver-bridge a.modoodoc-bridge-badge').click(),
+      entryFrame.locator('modoodoc-naver-bridge a.modoodoc-card-cta').click(),
     ]);
     await newTab.waitForLoadState('domcontentloaded');
+    expect(newTab.url()).toBe(MODOODOC_DETAIL_URL);
+
     await expect(popupPage.locator('.reviewed-pill')).toContainText(['리뷰 확인함']);
+    const organicChip = searchFrame.locator(
+      '[data-testid="organic-hospital"] modoodoc-naver-list-chip a.modoodoc-list-chip',
+    );
+    await expect(organicChip).toHaveClass(/is-reviewed/, { timeout: 5_000 });
+    await expect(organicChip).toContainText('리뷰 확인함');
+    expect(await organicChip.getAttribute('href')).toBe(MODOODOC_DETAIL_URL);
   } finally {
     await context.close();
     rmSync(userDataDir, { recursive: true, force: true });
