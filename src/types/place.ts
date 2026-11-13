@@ -33,6 +33,41 @@ export interface CategoryMatchResult {
   readonly matchedDepartment: string | null;
 }
 
+export interface ModoodocTreatmentTag {
+  readonly name: string;
+  readonly count: number;
+}
+
+export type ModoodocPriceBadge = '특가' | '이벤트' | null;
+
+export interface ModoodocPriceItem {
+  readonly name: string;
+  readonly displayPrice: string;
+  readonly originalPrice: string | null;
+  readonly badge: ModoodocPriceBadge;
+  readonly numericPrice: number;
+}
+
+export interface ModoodocHospitalSummary {
+  readonly hospitalId: number;
+  readonly name: string;
+  readonly address: string;
+  readonly detailUrl: string;
+  readonly totalScore: number | null;
+  readonly reviewCount: number;
+  readonly topTreatments: readonly ModoodocTreatmentTag[];
+  readonly topPrices: readonly ModoodocPriceItem[];
+  readonly totalPriceCount: number;
+}
+
+export interface HospitalPreviewSummary {
+  readonly detailUrl: string;
+  readonly totalScore: number | null;
+  readonly reviewCount: number;
+  readonly representativeTreatment: string | null;
+  readonly representativePrice: string | null;
+}
+
 export interface RecentHospitalRecord {
   readonly id: string;
   readonly name: string;
@@ -41,6 +76,25 @@ export interface RecentHospitalRecord {
   readonly searchUrl: string;
   readonly viewedAt: number;
   readonly clickedModoodoc: boolean;
+  readonly summary: HospitalPreviewSummary | null;
+}
+
+export interface CachedModoodocEntry {
+  readonly key: string;
+  readonly fetchedAt: number;
+  readonly summary: ModoodocHospitalSummary | null;
+}
+
+export interface FetchModoodocSummaryRequest {
+  readonly type: 'FETCH_MODOODOC_SUMMARY';
+  readonly hospitalName: string;
+  readonly regionHint: string;
+  readonly department: string;
+}
+
+export interface FetchModoodocSummaryResponse {
+  readonly ok: boolean;
+  readonly summary: ModoodocHospitalSummary | null;
 }
 
 export interface BridgeStorageState {

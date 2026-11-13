@@ -50,15 +50,43 @@ vi.mock('wxt/browser', () => ({
 }));
 
 import {
+  attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
+  getCachedHospitalSummary,
   MAX_RECENT_HOSPITALS,
   markHospitalClicked,
+  RECENT_HOSPITALS_KEY,
   recordHospitalView,
   removeRecentHospital,
+  SUMMARY_HIT_TTL_MS,
+  SUMMARY_MISS_TTL_MS,
   setBridgeEnabled,
+  setCachedHospitalSummary,
   subscribeBridgeEnabled,
+  subscribeRecentHospitals,
 } from '../src/domain/bridgeStorage';
+import type { ModoodocHospitalSummary } from '../src/types/place';
+
+const SAMPLE_SUMMARY: ModoodocHospitalSummary = {
+  hospitalId: 86566,
+  name: '강남케이안과의원',
+  address: '서울 강남구 역삼1동',
+  detailUrl: 'https://www.modoodoc.com/hospital/86566/test',
+  totalScore: 10,
+  reviewCount: 10,
+  topTreatments: [{ name: '스마일라식', count: 9 }],
+  topPrices: [
+    {
+      name: '스마일라식',
+      displayPrice: '209만원',
+      originalPrice: '350만원',
+      badge: '이벤트',
+      numericPrice: 2090000,
+    },
+  ],
+  totalPriceCount: 1,
+};
 
 describe('bridgeStorage', () => {
   beforeEach(() => {
@@ -66,6 +94,7 @@ describe('bridgeStorage', () => {
       delete store[key];
     }
     listeners.clear();
+    vi.useRealTimers();
   });
 
   it('초기 상태는 bridgeEnabled=true, recentHospitals=[]를 반환한다', async () => {
@@ -92,7 +121,6 @@ describe('bridgeStorage', () => {
       department: '치과',
       regionHint: '서울 서초구',
     });
-    // 다시 첫 번째 병원을 열람해도 clickedModoodoc=true는 유지되어야 함
     const list = await recordHospitalView({
       name: '강남밝은안과의원',
       department: '안과',
@@ -102,6 +130,7 @@ describe('bridgeStorage', () => {
     expect(list).toHaveLength(2);
     expect(list[0]?.name).toBe('강남밝은안과의원');
     expect(list[0]?.clickedModoodoc).toBe(true);
+    expect(list[0]?.summary).toBeNull();
     expect(list[1]?.name).toBe('서초바른치과의원');
     expect(list[1]?.clickedModoodoc).toBe(false);
   });
@@ -142,17 +171,96 @@ describe('bridgeStorage', () => {
     expect(afterClear.recentHospitals).toEqual([]);
   });
 
-  it('subscribeBridgeEnabled는 토글 변경을 실시간으로 전달하고 구독 해제가 가능하다', async () => {
-    const callback = vi.fn();
-    const unsubscribe = subscribeBridgeEnabled(callback);
+  it('subscribeBridgeEnabled와 subscribeRecentHospitals는 실시간 변경을 전달한다', async () => {
+    const enabledCallback = vi.fn();
+    const recentCallback = vi.fn();
+    const unsubEnabled = subscribeBridgeEnabled(enabledCallback);
+    const unsubRecent = subscribeRecentHospitals(recentCallback);
 
     await setBridgeEnabled(false);
+    await recordHospitalView({
+      name: '강남케이안과의원',
+      department: '안과',
+      regionHint: '서울 강남구',
+    });
+
+    expect(enabledCallback).toHaveBeenCalledWith(false);
+    expect(recentCallback).toHaveBeenCalledTimes(1);
+
+    unsubEnabled();
+    unsubRecent();
     await setBridgeEnabled(true);
-    expect(callback).toHaveBeenNthCalledWith(1, false);
-    expect(callback).toHaveBeenNthCalledWith(2, true);
+    expect(enabledCallback).toHaveBeenCalledTimes(1);
+  });
 
-    unsubscribe();
-    await setBridgeEnabled(false);
-    expect(callback).toHaveBeenCalledTimes(2);
+  it('summary 필드가 없는 레거시 레코드도 안전하게 호환하고 attachSummaryToRecentHospital로 병합한다', async () => {
+    store[RECENT_HOSPITALS_KEY] = [
+      {
+        id: '강남케이안과의원::서울 강남구',
+        name: '강남케이안과의원',
+        department: '안과',
+        regionHint: '서울 강남구',
+        searchUrl: 'https://www.modoodoc.com/hospitals/query-search?search_query=test',
+        viewedAt: Date.now(),
+        clickedModoodoc: false,
+      },
+    ];
+
+    const initialState = await getBridgeState();
+    expect(initialState.recentHospitals[0]?.summary).toBeNull();
+
+    const updated = await attachSummaryToRecentHospital(
+      '강남케이안과의원',
+      '서울 강남구',
+      SAMPLE_SUMMARY,
+    );
+    expect(updated[0]?.summary).toEqual({
+      detailUrl: 'https://www.modoodoc.com/hospital/86566/test',
+      totalScore: 10,
+      reviewCount: 10,
+      representativeTreatment: '스마일라식',
+      representativePrice: '209만원',
+    });
+
+    // 다시 열람해도 summary가 유지되어야 함
+    const afterRevisit = await recordHospitalView({
+      name: '강남케이안과의원',
+      department: '안과',
+      regionHint: '서울 강남구',
+    });
+    expect(afterRevisit[0]?.summary?.representativePrice).toBe('209만원');
+  });
+
+  it('요약 캐시 hit/miss TTL 만료를 정확히 판정한다', async () => {
+    vi.useFakeTimers();
+    const baseTime = new Date('2026-11-13T10:00:00Z').getTime();
+    vi.setSystemTime(baseTime);
+
+    await setCachedHospitalSummary('강남케이안과의원', '서울 강남구', SAMPLE_SUMMARY);
+    await setCachedHospitalSummary('미등록의원', '서울 서초구', null);
+
+    expect(await getCachedHospitalSummary('강남케이안과의원', '서울 강남구')).toEqual({
+      hit: true,
+      summary: SAMPLE_SUMMARY,
+    });
+    expect(await getCachedHospitalSummary('미등록의원', '서울 서초구')).toEqual({
+      hit: true,
+      summary: null,
+    });
+
+    // 30분 경과 시 miss 캐시는 만료, hit 캐시는 유지
+    vi.setSystemTime(baseTime + SUMMARY_MISS_TTL_MS + 1000);
+    expect(await getCachedHospitalSummary('미등록의원', '서울 서초구')).toEqual({
+      hit: false,
+      summary: null,
+    });
+    expect((await getCachedHospitalSummary('강남케이안과의원', '서울 강남구')).hit).toBe(true);
+
+    // 24시간 경과 시 hit 캐시도 만료
+    vi.setSystemTime(baseTime + SUMMARY_HIT_TTL_MS + 1000);
+    expect(await getCachedHospitalSummary('강남케이안과의원', '서울 강남구')).toEqual({
+      hit: false,
+      summary: null,
+    });
   });
 });
