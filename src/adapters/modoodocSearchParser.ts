@@ -418,33 +418,39 @@ function parseAllPrices(
   };
 }
 
+export type ModoodocSearchParseResult =
+  | { readonly kind: 'parse_error' }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'found'; readonly summary: ModoodocHospitalSummary };
+
 /**
  * 모두닥 검색 결과 HTML의 __NEXT_DATA__에서 대상 병원의 평점·리뷰·시술·가격 요약을 추출합니다.
+ * 응답 구조를 읽지 못한 경우(parse_error)와 읽었지만 대상 병원이 없는 경우(not_found)를 구분합니다.
  */
-export function parseModoodocSearchHtml(
+export function parseModoodocSearchResult(
   html: string,
   targetName: string,
   targetRegionHint = '',
-): ModoodocHospitalSummary | null {
+): ModoodocSearchParseResult {
   if (!html || !targetName) {
-    return null;
+    return { kind: 'parse_error' };
   }
 
   const scriptMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   const scriptContent = scriptMatch?.[1];
   if (!scriptContent) {
-    return null;
+    return { kind: 'parse_error' };
   }
 
   let nextData: unknown;
   try {
     nextData = JSON.parse(scriptContent);
   } catch {
-    return null;
+    return { kind: 'parse_error' };
   }
 
   if (!isRecordObject(nextData)) {
-    return null;
+    return { kind: 'parse_error' };
   }
 
   const props = isRecordObject(nextData.props) ? nextData.props : null;
@@ -455,6 +461,7 @@ export function parseModoodocSearchHtml(
     dehydratedState && Array.isArray(dehydratedState.queries) ? dehydratedState.queries : [];
 
   let rawHospitals: unknown[] = [];
+  let sawHospitalList = false;
 
   for (const query of queries) {
     if (!isRecordObject(query)) {
@@ -470,6 +477,7 @@ export function parseModoodocSearchHtml(
     const hasHospitalList = Array.isArray(data.hospitals);
 
     if (isMatchKey || hasHospitalList) {
+      sawHospitalList = hasHospitalList;
       const regularList = Array.isArray(data.hospitals) ? data.hospitals : [];
       const premiumList = Array.isArray(data.premiumAdHospitals) ? data.premiumAdHospitals : [];
       rawHospitals = [...regularList, ...premiumList];
@@ -477,8 +485,12 @@ export function parseModoodocSearchHtml(
     }
   }
 
+  if (!sawHospitalList) {
+    return { kind: 'parse_error' };
+  }
+
   if (rawHospitals.length === 0) {
-    return null;
+    return { kind: 'not_found' };
   }
 
   const candidateMap = new Map<number, RawCandidateHospital>();
@@ -516,7 +528,7 @@ export function parseModoodocSearchHtml(
   }
 
   if (scoredCandidates.length === 0) {
-    return null;
+    return { kind: 'not_found' };
   }
 
   scoredCandidates.sort((a, b) => {
@@ -528,7 +540,7 @@ export function parseModoodocSearchHtml(
 
   const best = scoredCandidates[0]?.candidate;
   if (!best) {
-    return null;
+    return { kind: 'not_found' };
   }
 
   const detailUrl = best.slug
@@ -541,7 +553,7 @@ export function parseModoodocSearchHtml(
     best.hiraTreatmentPrices,
   );
 
-  return {
+  const summary: ModoodocHospitalSummary = {
     hospitalId: best.id,
     name: best.name,
     address: best.address,
@@ -552,6 +564,20 @@ export function parseModoodocSearchHtml(
     topPrices,
     totalPriceCount,
   };
+
+  return { kind: 'found', summary };
+}
+
+/**
+ * 구조 오류와 미등록을 구분하지 않고 요약 또는 null만 필요할 때 쓰는 얇은 래퍼입니다.
+ */
+export function parseModoodocSearchHtml(
+  html: string,
+  targetName: string,
+  targetRegionHint = '',
+): ModoodocHospitalSummary | null {
+  const result = parseModoodocSearchResult(html, targetName, targetRegionHint);
+  return result.kind === 'found' ? result.summary : null;
 }
 
 /**

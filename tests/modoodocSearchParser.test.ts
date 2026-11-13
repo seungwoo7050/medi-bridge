@@ -4,6 +4,7 @@ import {
   formatKoreanWon,
   normalizeCompareName,
   parseModoodocSearchHtml,
+  parseModoodocSearchResult,
   stripClinicSuffix,
   toHospitalPreviewSummary,
 } from '../src/adapters/modoodocSearchParser';
@@ -241,5 +242,62 @@ describe('parseModoodocSearchHtml', () => {
     expect(
       parseModoodocSearchHtml('<script id="__NEXT_DATA__">{invalid</script>', '강남안과'),
     ).toBeNull();
+  });
+});
+
+describe('parseModoodocSearchResult', () => {
+  const emptyListQuery = {
+    queryKey: ['hospitalsWithQuery', { searchQuery: '서울 강남구 없는의원' }],
+    state: { data: { hospitals: [], premiumAdHospitals: [] } },
+  };
+
+  it('HTML이나 JSON이 깨졌거나 병원 목록 쿼리가 없으면 parse_error다', () => {
+    expect(parseModoodocSearchResult('', '강남안과', '서울 강남구')).toEqual({
+      kind: 'parse_error',
+    });
+    expect(
+      parseModoodocSearchResult('<html><body>empty</body></html>', '강남안과', '서울 강남구'),
+    ).toEqual({ kind: 'parse_error' });
+    expect(
+      parseModoodocSearchResult('<script id="__NEXT_DATA__">{invalid</script>', '강남안과'),
+    ).toEqual({ kind: 'parse_error' });
+    expect(
+      parseModoodocSearchResult(
+        buildMockHtml([{ queryKey: ['mddCommonInfoQuery'], state: { data: { commInfo: {} } } }]),
+        '강남안과',
+        '서울 강남구',
+      ),
+    ).toEqual({ kind: 'parse_error' });
+  });
+
+  it('병원 목록은 있는데 대상이 없으면 not_found다', () => {
+    expect(
+      parseModoodocSearchResult(buildMockHtml([emptyListQuery]), '없는의원', '서울 강남구'),
+    ).toEqual({ kind: 'not_found' });
+
+    const otherHospital = {
+      queryKey: ['hospitalsWithQuery', {}],
+      state: {
+        data: {
+          hospitals: [
+            {
+              id: 1,
+              name: 'YK안과의원',
+              slug: 'yk안과의원-서울-삼성동',
+              address: '서울 강남구 삼성2동',
+            },
+          ],
+          premiumAdHospitals: [],
+        },
+      },
+    };
+    expect(
+      parseModoodocSearchResult(buildMockHtml([otherHospital]), '강남케이안과의원', '서울 강남구'),
+    ).toEqual({ kind: 'not_found' });
+  });
+
+  it('parseModoodocSearchHtml은 parse_error와 not_found를 모두 null로 돌려준다', () => {
+    expect(parseModoodocSearchHtml('', '강남안과')).toBeNull();
+    expect(parseModoodocSearchHtml(buildMockHtml([emptyListQuery]), '없는의원')).toBeNull();
   });
 });

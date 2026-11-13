@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
-import { parseModoodocSearchHtml } from '../adapters/modoodocSearchParser';
+import { parseModoodocSearchResult } from '../adapters/modoodocSearchParser';
 import {
   attachSummaryToRecentHospital,
   getCachedHospitalSummary,
@@ -119,7 +119,12 @@ async function fetchHospitalSummary(
       }
 
       const html = await res.text();
-      const summary = parseModoodocSearchHtml(html, req.hospitalName, req.regionHint);
+      const parsed = parseModoodocSearchResult(html, req.hospitalName, req.regionHint);
+      if (parsed.kind === 'parse_error') {
+        // 응답 구조를 읽지 못한 것은 미등록이 아니므로 캐시하지 않아 다음 시도에서 다시 조회한다.
+        return { ok: false, summary: null };
+      }
+      const summary = parsed.kind === 'found' ? parsed.summary : null;
 
       await setCachedHospitalSummary(req.hospitalName, req.regionHint, summary);
       if (summary !== null) {
@@ -141,12 +146,6 @@ async function fetchHospitalSummary(
 async function openHospitalInModoodoc(
   req: OpenModoodocHospitalRequest,
 ): Promise<OpenModoodocHospitalResponse> {
-  await markHospitalClicked({
-    name: req.hospitalName,
-    department: req.department,
-    regionHint: req.regionHint,
-  });
-
   const resolved = await fetchHospitalSummary({
     type: 'FETCH_MODOODOC_SUMMARY',
     hospitalName: req.hospitalName,
@@ -157,6 +156,12 @@ async function openHospitalInModoodoc(
   const targetUrl =
     resolved.summary?.detailUrl ?? buildModoodocSearchUrl(req.hospitalName, req.regionHint);
   await browser.tabs.create({ url: targetUrl });
+  // 탭이 실제로 열린 뒤에 기록한다. 요약은 위에서 캐시에 저장되어 기록에 함께 합쳐진다.
+  await markHospitalClicked({
+    name: req.hospitalName,
+    department: req.department,
+    regionHint: req.regionHint,
+  });
   return { ok: true, targetUrl };
 }
 
