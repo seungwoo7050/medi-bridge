@@ -5,9 +5,16 @@
 :host {
   all: initial;
   display: block;
+}
+
+.modoodoc-bridge-wrapper,
+.modoodoc-list-chip-wrapper {
   font-family:
-    -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic",
-    sans-serif;
+    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .modoodoc-bridge-wrapper {
