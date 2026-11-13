@@ -23,6 +23,20 @@ export const MAX_SUMMARY_CACHE = 60;
 export const SUMMARY_HIT_TTL_MS = 24 * 60 * 60 * 1000;
 export const SUMMARY_MISS_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * storage.local은 읽고 통째로 쓰는 갱신(read-modify-write)이 트랜잭션이 아니라서, 같은 환경 안에서
+ * 갱신 둘이 겹치면 나중에 쓴 쪽이 먼저 쓴 쪽의 변경을 덮는다. 모든 갱신을 이 큐로 한 줄에 세운다.
+ * 환경(content script, 팝업, service worker)이 달라도 갱신은 service worker 한 곳에서 실행한다
+ * (historyGateway.ts).
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(task, task);
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+
 export interface HospitalHistoryInput {
   readonly name: string;
   readonly department: string;
@@ -129,7 +143,7 @@ export async function setBridgeEnabled(enabled: boolean): Promise<void> {
   await browser.storage.local.set({ [BRIDGE_ENABLED_KEY]: enabled });
 }
 
-async function upsertHospitalHistory(
+async function upsertHospitalHistoryUnlocked(
   input: HospitalHistoryInput,
   markClicked: boolean,
 ): Promise<readonly RecentHospitalRecord[]> {
@@ -187,7 +201,7 @@ async function upsertHospitalHistory(
 export async function recordHospitalView(
   input: HospitalHistoryInput,
 ): Promise<readonly RecentHospitalRecord[]> {
-  return upsertHospitalHistory(input, false);
+  return enqueueWrite(() => upsertHospitalHistoryUnlocked(input, false));
 }
 
 /**
@@ -196,13 +210,13 @@ export async function recordHospitalView(
 export async function markHospitalClicked(
   input: HospitalHistoryInput,
 ): Promise<readonly RecentHospitalRecord[]> {
-  return upsertHospitalHistory(input, true);
+  return enqueueWrite(() => upsertHospitalHistoryUnlocked(input, true));
 }
 
 /**
  * 최근 본 병원 목록에서 특정 항목만 제거합니다.
  */
-export async function removeRecentHospital(id: string): Promise<readonly RecentHospitalRecord[]> {
+async function removeRecentHospitalUnlocked(id: string): Promise<readonly RecentHospitalRecord[]> {
   const stored = await browser.storage.local.get(RECENT_HOSPITALS_KEY);
   const existingList = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
   const nextList = existingList.filter((item) => item.id !== id);
@@ -213,7 +227,7 @@ export async function removeRecentHospital(id: string): Promise<readonly RecentH
 /**
  * 최근 본 병원 목록 전체를 비웁니다.
  */
-export async function clearRecentHospitals(): Promise<void> {
+async function clearRecentHospitalsUnlocked(): Promise<void> {
   await browser.storage.local.set({ [RECENT_HOSPITALS_KEY]: [] });
 }
 
@@ -297,9 +311,9 @@ export async function getCachedHospitalSummary(
 }
 
 /**
- * 모두닥 병원 요약 정보를 로컬 캐시에 저장합니다 (최대 60건 LRU).
+ * 모두닥 병원 요약 정보를 로컬 캐시에 저장합니다 (최대 60건, 읽어도 순서가 바뀌지 않으므로 오래 저장된 항목부터 밀려남).
  */
-export async function setCachedHospitalSummary(
+async function setCachedHospitalSummaryUnlocked(
   name: string,
   regionHint: string,
   summary: ModoodocHospitalSummary | null,
@@ -329,7 +343,7 @@ export async function setCachedHospitalSummary(
  * 최근 본 병원 목록에 존재하는 항목에 모두닥 요약 정보(미리보기용)를 첨부합니다.
  * 항목이 존재할 때만 업데이트하고 저장합니다.
  */
-export async function attachSummaryToRecentHospital(
+async function attachSummaryToRecentHospitalUnlocked(
   name: string,
   regionHint: string,
   summary: ModoodocHospitalSummary,
@@ -364,4 +378,40 @@ export async function attachSummaryToRecentHospital(
 
   await browser.storage.local.set({ [RECENT_HOSPITALS_KEY]: nextList });
   return nextList;
+}
+
+/**
+ * 최근 본 병원 목록에서 특정 항목만 제거합니다.
+ */
+export function removeRecentHospital(id: string): Promise<readonly RecentHospitalRecord[]> {
+  return enqueueWrite(() => removeRecentHospitalUnlocked(id));
+}
+
+/**
+ * 최근 본 병원 목록 전체를 비웁니다.
+ */
+export function clearRecentHospitals(): Promise<void> {
+  return enqueueWrite(() => clearRecentHospitalsUnlocked());
+}
+
+/**
+ * 모두닥 병원 요약 정보를 로컬 캐시에 저장합니다.
+ */
+export function setCachedHospitalSummary(
+  name: string,
+  regionHint: string,
+  summary: ModoodocHospitalSummary | null,
+): Promise<void> {
+  return enqueueWrite(() => setCachedHospitalSummaryUnlocked(name, regionHint, summary));
+}
+
+/**
+ * 최근 본 병원 목록에 존재하는 항목에 모두닥 요약 정보(미리보기용)를 첨부합니다.
+ */
+export function attachSummaryToRecentHospital(
+  name: string,
+  regionHint: string,
+  summary: ModoodocHospitalSummary,
+): Promise<readonly RecentHospitalRecord[]> {
+  return enqueueWrite(() => attachSummaryToRecentHospitalUnlocked(name, regionHint, summary));
 }

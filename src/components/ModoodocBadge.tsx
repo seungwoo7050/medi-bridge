@@ -1,7 +1,8 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { attachSummaryToRecentHospital, getCachedHospitalSummary } from '../domain/bridgeStorage';
+import { getCachedHospitalSummary } from '../domain/bridgeStorage';
+import { attachSummaryViaWorker } from '../domain/historyGateway';
 import { buildModoodocSearchUrl } from '../domain/modoodocUrl';
 import type {
   FetchModoodocSummaryRequest,
@@ -60,7 +61,7 @@ export function ModoodocBadge({
         setSummary(cached.summary);
         setLoading(false);
         if (cached.summary !== null) {
-          void attachSummaryToRecentHospital(hospitalName, regionHint, cached.summary);
+          void attachSummaryViaWorker(hospitalName, regionHint, cached.summary);
         }
         return;
       }

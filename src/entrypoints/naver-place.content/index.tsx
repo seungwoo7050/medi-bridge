@@ -11,11 +11,13 @@ import { ModoodocBadge } from '../../components/ModoodocBadge';
 import { ModoodocListChip } from '../../components/ModoodocListChip';
 import {
   getBridgeState,
-  markHospitalClicked,
-  recordHospitalView,
   subscribeBridgeEnabled,
   subscribeRecentHospitals,
 } from '../../domain/bridgeStorage';
+import {
+  markHospitalClickedViaWorker,
+  recordHospitalViewViaWorker,
+} from '../../domain/historyGateway';
 import { buildHospitalKey } from '../../domain/modoodocUrl';
 import type { ExtractedSearchListHospital, RecentHospitalRecord } from '../../types/place';
 import './style.css';
@@ -70,7 +72,7 @@ export default defineContentScript({
           isVisited={isVisited}
           detailUrl={detailUrl}
           onSelect={() => {
-            void markHospitalClicked({
+            void markHospitalClickedViaWorker({
               name: item.name,
               department: item.matchedDepartment,
               regionHint: item.regionHint,
@@ -140,7 +142,7 @@ export default defineContentScript({
               regionHint={place.regionHint}
               department={place.matchedDepartment}
               onSelect={() => {
-                void markHospitalClicked({
+                void markHospitalClickedViaWorker({
                   name: place.name,
                   department: place.matchedDepartment,
                   regionHint: place.regionHint,
@@ -166,7 +168,7 @@ export default defineContentScript({
 
       if (lastRecordedSignature !== nextSignature) {
         lastRecordedSignature = nextSignature;
-        void recordHospitalView({
+        void recordHospitalViewViaWorker({
           name: place.name,
           department: place.matchedDepartment,
           regionHint: place.regionHint,

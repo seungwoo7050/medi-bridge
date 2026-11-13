@@ -109,6 +109,32 @@ export interface OpenModoodocHospitalResponse {
   readonly targetUrl: string;
 }
 
+export type HistoryMutation =
+  | {
+      readonly op: 'view' | 'click';
+      readonly name: string;
+      readonly department: string;
+      readonly regionHint: string;
+    }
+  | { readonly op: 'remove'; readonly id: string }
+  | { readonly op: 'clear' }
+  | {
+      readonly op: 'attach';
+      readonly name: string;
+      readonly regionHint: string;
+      readonly summary: ModoodocHospitalSummary;
+    };
+
+export interface MutateHistoryRequest {
+  readonly type: 'MUTATE_HISTORY';
+  readonly mutation: HistoryMutation;
+}
+
+export interface MutateHistoryResponse {
+  readonly ok: boolean;
+  readonly recentHospitals: readonly RecentHospitalRecord[];
+}
+
 export interface BridgeStorageState {
   readonly bridgeEnabled: boolean;
   readonly recentHospitals: readonly RecentHospitalRecord[];

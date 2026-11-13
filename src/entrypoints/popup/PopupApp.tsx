@@ -1,14 +1,12 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
+import { getBridgeState, RECENT_HOSPITALS_KEY, setBridgeEnabled } from '../../domain/bridgeStorage';
 import {
-  clearRecentHospitals,
-  getBridgeState,
-  markHospitalClicked,
-  RECENT_HOSPITALS_KEY,
-  removeRecentHospital,
-  setBridgeEnabled,
-} from '../../domain/bridgeStorage';
+  clearRecentHospitalsViaWorker,
+  markHospitalClickedViaWorker,
+  removeRecentHospitalViaWorker,
+} from '../../domain/historyGateway';
 import { buildModoodocSearchUrl } from '../../domain/modoodocUrl';
 import type { OpenModoodocHospitalRequest, RecentHospitalRecord } from '../../types/place';
 
@@ -90,7 +88,7 @@ export function PopupApp(): React.JSX.Element {
 
   const handleOpenHistoryItem = async (record: RecentHospitalRecord) => {
     if (record.summary?.detailUrl) {
-      const updated = await markHospitalClicked({
+      const updated = await markHospitalClickedViaWorker({
         name: record.name,
         department: record.department,
         regionHint: record.regionHint,
@@ -111,7 +109,7 @@ export function PopupApp(): React.JSX.Element {
       await browser.runtime.sendMessage(req);
       await loadState();
     } catch {
-      const updated = await markHospitalClicked({
+      const updated = await markHospitalClickedViaWorker({
         name: record.name,
         department: record.department,
         regionHint: record.regionHint,
@@ -123,12 +121,12 @@ export function PopupApp(): React.JSX.Element {
 
   const handleRemoveItem = async (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
     event.stopPropagation();
-    const updated = await removeRecentHospital(id);
+    const updated = await removeRecentHospitalViaWorker(id);
     setRecentHospitals(updated);
   };
 
   const handleClearAll = async () => {
-    await clearRecentHospitals();
+    await clearRecentHospitalsViaWorker();
     setRecentHospitals([]);
   };
 

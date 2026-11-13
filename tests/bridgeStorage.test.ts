@@ -264,3 +264,35 @@ describe('bridgeStorage', () => {
     });
   });
 });
+
+describe('동시 갱신', () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+    for (const key of Object.keys(store)) {
+      delete store[key];
+    }
+  });
+
+  it('서로 다른 병원의 기록을 동시에 갱신해도 둘 다 남는다', async () => {
+    await Promise.all([
+      recordHospitalView({ name: '가나다의원', department: '내과', regionHint: '서울 강남구' }),
+      markHospitalClicked({ name: '라마바의원', department: '피부과', regionHint: '서울 서초구' }),
+    ]);
+
+    const state = await getBridgeState();
+    expect(state.recentHospitals.map((item) => item.name).sort()).toEqual([
+      '가나다의원',
+      '라마바의원',
+    ]);
+  });
+
+  it('요약 캐시를 동시에 저장해도 두 항목이 모두 남는다', async () => {
+    await Promise.all([
+      setCachedHospitalSummary('강남케이안과의원', '서울 강남구', SAMPLE_SUMMARY),
+      setCachedHospitalSummary('미등록의원', '서울 서초구', null),
+    ]);
+
+    expect((await getCachedHospitalSummary('강남케이안과의원', '서울 강남구')).hit).toBe(true);
+    expect((await getCachedHospitalSummary('미등록의원', '서울 서초구')).hit).toBe(true);
+  });
+});

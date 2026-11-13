@@ -7,6 +7,7 @@ import {
   markHospitalClicked,
   setCachedHospitalSummary,
 } from '../domain/bridgeStorage';
+import { applyHistoryMutation } from '../domain/historyGateway';
 import {
   buildHospitalKey,
   buildModoodocSearchUrl,
@@ -16,6 +17,8 @@ import {
 import type {
   FetchModoodocSummaryRequest,
   FetchModoodocSummaryResponse,
+  HistoryMutation,
+  MutateHistoryRequest,
   OpenModoodocHospitalRequest,
   OpenModoodocHospitalResponse,
 } from '../types/place';
@@ -45,6 +48,39 @@ function isOpenModoodocHospitalRequest(value: unknown): value is OpenModoodocHos
     typeof value.hospitalName === 'string' &&
     typeof value.regionHint === 'string' &&
     typeof value.department === 'string'
+  );
+}
+
+function isHistoryMutation(value: unknown): value is HistoryMutation {
+  if (!isRecordObject(value)) {
+    return false;
+  }
+  switch (value.op) {
+    case 'view':
+    case 'click':
+      return (
+        typeof value.name === 'string' &&
+        typeof value.department === 'string' &&
+        typeof value.regionHint === 'string'
+      );
+    case 'remove':
+      return typeof value.id === 'string';
+    case 'clear':
+      return true;
+    case 'attach':
+      return (
+        typeof value.name === 'string' &&
+        typeof value.regionHint === 'string' &&
+        isRecordObject(value.summary)
+      );
+    default:
+      return false;
+  }
+}
+
+function isMutateHistoryRequest(value: unknown): value is MutateHistoryRequest {
+  return (
+    isRecordObject(value) && value.type === 'MUTATE_HISTORY' && isHistoryMutation(value.mutation)
   );
 }
 
@@ -133,6 +169,17 @@ export default defineBackground(() => {
         })
         .catch(() => {
           sendResponse({ ok: false, summary: null });
+        });
+      return true;
+    }
+
+    if (isMutateHistoryRequest(message)) {
+      applyHistoryMutation(message.mutation)
+        .then((recentHospitals) => {
+          sendResponse({ ok: true, recentHospitals });
+        })
+        .catch(() => {
+          sendResponse({ ok: false, recentHospitals: [] });
         });
       return true;
     }
