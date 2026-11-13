@@ -311,6 +311,43 @@ body {
   border-radius: 4px;
 }
 
+.history-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px dashed #e4e4e7;
+}
+
+.summary-score {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.summary-reviews {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #52525b;
+  flex-shrink: 0;
+}
+
+.summary-treatment {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5b36f2;
+  background-color: #ede9fe;
+  padding: 1px 6px;
+  border-radius: 4px;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .delete-item-button {
   border: none;
   background: transparent;

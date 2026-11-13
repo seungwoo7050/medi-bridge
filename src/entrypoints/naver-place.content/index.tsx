@@ -14,7 +14,10 @@ import {
   markHospitalClicked,
   recordHospitalView,
   subscribeBridgeEnabled,
+  subscribeRecentHospitals,
 } from '../../domain/bridgeStorage';
+import { buildHospitalKey } from '../../domain/modoodocUrl';
+import type { ExtractedSearchListHospital, RecentHospitalRecord } from '../../types/place';
 import './style.css';
 
 const ENTRY_SHADOW_HOST_NAME = 'modoodoc-naver-bridge';
@@ -23,6 +26,8 @@ const DEBOUNCE_MS = 120;
 
 interface MountedListChip {
   readonly key: string;
+  readonly item: ExtractedSearchListHospital;
+  readonly root: ReactDOM.Root;
   readonly ui: ShadowRootContentScriptUi<ReactDOM.Root>;
 }
 
@@ -41,7 +46,44 @@ export default defineContentScript({
     let pendingResync = false;
     let debounceTimer: number | null = null;
 
+    const recentHospitalsMap = new Map<string, RecentHospitalRecord>();
     const mountedListChips = new Map<HTMLElement, MountedListChip>();
+
+    const updateRecentHospitalsMemory = (records: readonly RecentHospitalRecord[]) => {
+      recentHospitalsMap.clear();
+      for (const record of records) {
+        recentHospitalsMap.set(record.id, record);
+      }
+    };
+
+    const renderChipIntoRoot = (root: ReactDOM.Root, item: ExtractedSearchListHospital) => {
+      const hospitalKey = buildHospitalKey(item.name, item.regionHint);
+      const historyRecord = recentHospitalsMap.get(hospitalKey);
+      const isReviewed = historyRecord?.clickedModoodoc === true;
+      const detailUrl = historyRecord?.summary?.detailUrl ?? null;
+
+      root.render(
+        <ModoodocListChip
+          hospitalName={item.name}
+          regionHint={item.regionHint}
+          isReviewed={isReviewed}
+          detailUrl={detailUrl}
+          onSelect={() => {
+            void markHospitalClicked({
+              name: item.name,
+              department: item.matchedDepartment,
+              regionHint: item.regionHint,
+            });
+          }}
+        />,
+      );
+    };
+
+    const rerenderAllMountedListChips = () => {
+      for (const mounted of mountedListChips.values()) {
+        renderChipIntoRoot(mounted.root, mounted.item);
+      }
+    };
 
     const cleanupEntryUi = () => {
       if (activeEntryUi) {
@@ -95,6 +137,7 @@ export default defineContentScript({
             <ModoodocBadge
               hospitalName={place.name}
               regionHint={place.regionHint}
+              department={place.matchedDepartment}
               onSelect={() => {
                 void markHospitalClicked({
                   name: place.name,
@@ -166,6 +209,8 @@ export default defineContentScript({
           mountedListChips.delete(item.itemElement);
         }
 
+        let chipRoot: ReactDOM.Root | null = null;
+
         const ui = await createShadowRootUi(ctx, {
           name: LIST_SHADOW_HOST_NAME,
           position: 'inline',
@@ -176,19 +221,8 @@ export default defineContentScript({
             const mountNode = document.createElement('div');
             container.append(mountNode);
             const root = ReactDOM.createRoot(mountNode);
-            root.render(
-              <ModoodocListChip
-                hospitalName={item.name}
-                regionHint={item.regionHint}
-                onSelect={() => {
-                  void markHospitalClicked({
-                    name: item.name,
-                    department: item.matchedDepartment,
-                    regionHint: item.regionHint,
-                  });
-                }}
-              />,
-            );
+            chipRoot = root;
+            renderChipIntoRoot(root, item);
             return root;
           },
           onRemove: (root) => {
@@ -202,7 +236,14 @@ export default defineContentScript({
         }
 
         ui.mount();
-        mountedListChips.set(item.itemElement, { key: item.itemKey, ui });
+        if (chipRoot) {
+          mountedListChips.set(item.itemElement, {
+            key: item.itemKey,
+            item,
+            root: chipRoot,
+            ui,
+          });
+        }
       }
     };
 
@@ -263,11 +304,17 @@ export default defineContentScript({
       }
     });
 
+    const unsubscribeRecent = subscribeRecentHospitals((records) => {
+      updateRecentHospitalsMemory(records);
+      rerenderAllMountedListChips();
+    });
+
     void getBridgeState().then((state) => {
       if (ctx.isInvalid) {
         return;
       }
       bridgeEnabled = state.bridgeEnabled;
+      updateRecentHospitalsMemory(state.recentHospitals);
       if (bridgeEnabled) {
         void runSync();
       }
@@ -276,6 +323,7 @@ export default defineContentScript({
     ctx.onInvalidated(() => {
       observer.disconnect();
       unsubscribeStorage();
+      unsubscribeRecent();
       if (debounceTimer !== null) {
         window.clearTimeout(debounceTimer);
       }

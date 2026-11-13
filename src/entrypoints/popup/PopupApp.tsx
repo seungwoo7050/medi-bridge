@@ -95,7 +95,8 @@ export function PopupApp(): React.JSX.Element {
       regionHint: record.regionHint,
     });
     setRecentHospitals(updated);
-    await openExternalTab(record.searchUrl);
+    const targetUrl = record.summary?.detailUrl ?? record.searchUrl;
+    await openExternalTab(targetUrl);
   };
 
   const handleRemoveItem = async (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
@@ -167,7 +168,7 @@ export function PopupApp(): React.JSX.Element {
       <section className="popup-section history-section">
         <div className="section-head">
           <h2 className="section-title">
-            최근 본 병원 <span className="count-pill">{recentHospitals.length}</span>
+            최근 본 병원 · 비교함 <span className="count-pill">{recentHospitals.length}</span>
           </h2>
           {recentHospitals.length > 0 && (
             <button
@@ -191,38 +192,59 @@ export function PopupApp(): React.JSX.Element {
           </div>
         ) : (
           <ul className="history-list">
-            {recentHospitals.map((item) => (
-              <li key={item.id} className="history-item">
-                <button
-                  type="button"
-                  className="history-item-main"
-                  onClick={() => {
-                    void handleOpenHistoryItem(item);
-                  }}
-                >
-                  <div className="history-top-row">
-                    <span className="history-name">{item.name}</span>
-                    <span className="dept-badge">{item.department}</span>
-                  </div>
-                  <div className="history-meta-row">
-                    <span>{item.regionHint || '지역 정보 없음'}</span>
-                    <span>·</span>
-                    <span>{formatRelativeTime(item.viewedAt)}</span>
-                    {item.clickedModoodoc && <span className="reviewed-pill">리뷰 확인함</span>}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className="delete-item-button"
-                  aria-label={`${item.name} 기록 삭제`}
-                  onClick={(e) => {
-                    void handleRemoveItem(e, item.id);
-                  }}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
+            {recentHospitals.map((item) => {
+              const summary = item.summary;
+              let repLabel: string | null = null;
+              if (summary?.representativeTreatment && summary?.representativePrice) {
+                repLabel = `${summary.representativeTreatment} ${summary.representativePrice}`;
+              } else if (summary?.representativeTreatment) {
+                repLabel = `#${summary.representativeTreatment}`;
+              }
+
+              return (
+                <li key={item.id} className="history-item">
+                  <button
+                    type="button"
+                    className="history-item-main"
+                    onClick={() => {
+                      void handleOpenHistoryItem(item);
+                    }}
+                  >
+                    <div className="history-top-row">
+                      <span className="history-name">{item.name}</span>
+                      <span className="dept-badge">{item.department}</span>
+                    </div>
+                    <div className="history-meta-row">
+                      <span>{item.regionHint || '지역 정보 없음'}</span>
+                      <span>·</span>
+                      <span>{formatRelativeTime(item.viewedAt)}</span>
+                      {item.clickedModoodoc && <span className="reviewed-pill">리뷰 확인함</span>}
+                    </div>
+                    {summary !== null && (
+                      <div className="history-summary-row">
+                        {summary.totalScore !== null && (
+                          <span className="summary-score">★ {summary.totalScore.toFixed(1)}</span>
+                        )}
+                        <span className="summary-reviews">
+                          리뷰 {summary.reviewCount.toLocaleString('ko-KR')}건
+                        </span>
+                        {repLabel !== null && <span className="summary-treatment">{repLabel}</span>}
+                      </div>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-item-button"
+                    aria-label={`${item.name} 기록 삭제`}
+                    onClick={(e) => {
+                      void handleRemoveItem(e, item.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
