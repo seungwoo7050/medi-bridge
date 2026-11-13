@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# WXT build & generated types
+.output/
+.wxt/
+
+# Test & coverage
+coverage/
+playwright-report/
+test-results/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+!.env.example
