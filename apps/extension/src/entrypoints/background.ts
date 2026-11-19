@@ -26,6 +26,7 @@ import {
   extractRegionHintFromAddress,
   normalizeHospitalName,
 } from '../domain/modoodocUrl';
+import { API_BASE_URL } from '../domain/serviceUrls';
 import type {
   CompareBoundsClinicsRequest,
   CompareBoundsClinicsResponse,
@@ -40,7 +41,6 @@ import type {
   OpenModoodocHospitalResponse,
 } from '../types/place';
 
-const API_BASE_URL = 'http://localhost:3000';
 const seedRepo = new SeedComparisonRepository();
 
 const ACTIVE_ICON_PATHS = {

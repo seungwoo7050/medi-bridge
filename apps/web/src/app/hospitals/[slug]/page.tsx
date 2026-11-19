@@ -3,6 +3,11 @@ import type React from 'react';
 import { HospitalDetailClient } from '@/components/HospitalDetailClient';
 import { comparisonRepo } from '@/lib/repo';
 
+export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
+  const clinics = await comparisonRepo.listHospitals({ includeVat: true });
+  return clinics.map((clinic) => ({ slug: clinic.slug }));
+}
+
 export default async function HospitalDetailPage({
   params,
 }: {

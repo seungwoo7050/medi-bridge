@@ -15,9 +15,8 @@ import {
   removeRecentHospitalViaWorker,
 } from '../../domain/historyGateway';
 import { buildModoodocSearchUrl } from '../../domain/modoodocUrl';
+import { WEB_APP_URL } from '../../domain/serviceUrls';
 import type { OpenModoodocHospitalRequest, RecentHospitalRecord } from '../../types/place';
-
-const WEB_APP_URL = 'http://localhost:3000';
 
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp);

@@ -1,6 +1,10 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
 
+const PRODUCTION_WEB_ORIGIN = (
+  process.env.WXT_PUBLIC_WEB_URL || 'https://medi-bridge.seungwoo7050.workers.dev'
+).replace(/\/+$/, '');
+
 export default defineConfig({
   srcDir: 'src',
   // 크롬 확장프로그램 로드 선택기에서 숨김 폴더(.output)가 보이지 않는 문제를 방지하기 위해 일반 폴더명 사용
@@ -21,7 +25,7 @@ export default defineConfig({
       'https://map.naver.com/*',
       'https://pcmap.place.naver.com/*',
       'https://www.modoodoc.com/*',
-      'http://localhost:3000/*',
+      `${PRODUCTION_WEB_ORIGIN}/*`,
     ],
     action: {
       default_title: '메디 브릿지 (MEDI BRIDGE)',

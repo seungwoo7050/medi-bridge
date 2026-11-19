@@ -14,6 +14,8 @@ apps/extension/output/
 apps/extension/.wxt/
 apps/web/.next/
 apps/web/out/
+apps/web/.cf-dist/
+apps/web/.wrangler/
 
 # Test & coverage
 coverage/

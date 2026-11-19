@@ -183,7 +183,7 @@ test('네이버 지도 Medical Bento 비교 카드, VAT 실시간 재정렬, 반
         if (url.includes('/api/v1/hospitals/bounds')) {
           g.__boundsCalls = (g.__boundsCalls ?? 0) + 1;
         }
-        if (url.startsWith('http://localhost:3000/')) {
+        if (url.includes('/api/v1/')) {
           return new Response(null, { status: 503 });
         }
         return origFetch(input, init);
