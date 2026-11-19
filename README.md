@@ -2,6 +2,8 @@
 
 네이버 지도 위에서 건강보험심사평가원(심평원) 비급여 진료비 신고 정가와 여러 미용·진료 플랫폼의 이벤트 가격을 한 화면에서 대조하고, 자체 반응형 웹으로도 병원별 실질 결제 금액을 비교할 수 있는 Chrome Extension(MV3) + Next.js 모노레포 프로젝트입니다.
 
+- **라이브 비교 웹**: [medi-bridge.seungwoo7050.workers.dev](https://medi-bridge.seungwoo7050.workers.dev) (`/` 가격 비교 보드 · `/intro` VAT 시뮬레이터 · `/privacy` 개인정보처리방침)
+
 ![메디 브릿지 웹 및 Medical Bento 가격 비교 화면](./assets/preview.png)
 
 ---
@@ -24,7 +26,7 @@
 - **상세 패널 Medical Bento 비교 카드 (`#entryIframe`)**: 심평원 정가 대비 할인율 배지, `VAT 포함 / 표기가` 전환 스위치, 플랫폼별 실질 최저가 순위표(1위 하이라이트) 및 예약처 직행 링크를 Shadow DOM 내부에 독립 마운트합니다.
 - **검색 목록 Ghost 칩 및 반경 최저가 드로어 (`#searchIframe`)**: 목록 초기 로딩에서는 외부 API를 호출하지 않고(자동 호출 0건) 심평원 기준 칩만 붙이며, 사용자가 좌측 하단 플로팅 드로어를 열 때만 반경 내 병원을 온디맨드로 조회해 최저가순·할인율순·평점순으로 정렬합니다.
 - **Dual-Source 조회 및 장애 안전성**: 백엔드 API(`/api/v1/hospitals/match`) 조회를 우선 시도하되 실패 시 브라우저 안전 시드(`@medi-bridge/db/seed`)와 모두닥 SSR 파서(`__NEXT_DATA__`) 폴백으로 이어집니다. `parse_error` 응답은 캐시에 저장하지 않고, 동일 병원 중복 요청은 `inFlight` 맵으로 합치며, 스토리지 기록은 `enqueueWrite` 직렬 큐로 경합을 막습니다.
-- **Popup 비교함 및 툴바 상태 아이콘**: 오버레이 ON/OFF 토글에 따라 확장 툴바 아이콘을 활성/비활성 리소스로 전환하고, 최근 본 병원 최대 20건 비교함과 자체 웹(`localhost:3000` / `/intro`) 바로가기를 제공합니다.
+- **Popup 비교함 및 툴바 상태 아이콘**: 오버레이 ON/OFF 토글에 따라 확장 툴바 아이콘을 활성/비활성 리소스로 전환하고, 최근 본 병원 최대 20건 비교함과 라이브 비교 웹(`https://medi-bridge.seungwoo7050.workers.dev` 및 `/intro`) 바로가기를 제공합니다. (`WXT_PUBLIC_WEB_URL` 환경 변수로 운영 도메인/로컬 도메인을 전환합니다.)
 
 ### 2. 자체 비교 웹 및 API (`apps/web`)
 - **반응형 비교 보드 (`/`)**: 진료과·지역 필터, 검색어 입력, VAT 포함 토글, 좌표 핀 뷰어, 심평원 정가 대비 플랫폼 최저가 카드를 제공합니다.
@@ -53,7 +55,7 @@ medi-bridge/
 
 ---
 
-## 로컬 실행 및 Chrome 로드
+## 로컬 실행, 엣지 배포 및 Chrome 웹스토어 패키징
 
 사전 요구사항: Node.js 22+, `pnpm`
 
@@ -65,24 +67,31 @@ pnpm install
 pnpm build
 ```
 
-개발 서버는 앱 단위로 실행할 수 있습니다.
+확장프로그램은 기본으로 운영 Cloudflare Workers 도메인(`https://medi-bridge.seungwoo7050.workers.dev`)을 참조합니다. 로컬 Next.js API 서버와 붙여 테스트할 때만 `WXT_PUBLIC_WEB_URL=http://localhost:3000`을 지정합니다.
 
 ```bash
 # Next.js 비교 웹 개발 서버 (기본 http://localhost:3000)
 pnpm dev:web
 
-# Chrome Extension WXT 개발 모드
-pnpm dev:ext
+# Chrome Extension WXT 개발 모드 (로컬 API 연결)
+WXT_PUBLIC_WEB_URL=http://localhost:3000 pnpm dev:ext
+
+# Cloudflare Workers 정적 웹 + 엣지 API(/api/v1/*) 번들 빌드 및 배포
+pnpm --filter @medi-bridge/web run build:cf
+pnpm --filter @medi-bridge/web run deploy:cf
 ```
 
-빌드된 확장프로그램을 Chrome에 로드하는 순서:
+빌드된 확장프로그램을 Chrome에 로드하거나 웹스토어 제출용 아카이브로 묶는 순서:
 
 1. 주소창에서 `chrome://extensions` 로 이동합니다.
 2. 우측 상단 **개발자 모드**를 켭니다.
 3. **압축해제된 확장 프로그램을 로드합니다**를 클릭하고 `apps/extension/output/chrome-mv3` 디렉터리를 선택합니다.
 4. [네이버 지도](https://map.naver.com)에서 치과, 안과, 피부과 등을 검색해 상세 비교 카드와 좌측 하단 반경 최저가 보드를 확인합니다.
 
-(`pnpm zip:ext` 명령으로 Chrome 웹스토어 제출용 압축 아카이브를 생성할 수 있습니다.)
+```bash
+# Chrome 웹스토어 제출용 압축 아카이브 생성 (localhost 권한 제외, apps/extension/output/medi-bridgeextension-1.0.0-chrome.zip)
+pnpm zip:ext
+```
 
 ---
 
