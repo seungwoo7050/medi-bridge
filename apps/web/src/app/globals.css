@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --mb-indigo: #1e2456;
+  --mb-indigo-surface: #252d6b;
+  --mb-sage: #86b898;
+  --mb-sage-deep: #2f6f55;
+  --mb-bg: #f6f7fb;
+}
+
+body {
+  background-color: var(--mb-bg);
+  color: #111827;
+  font-family:
+    "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.bento-glass {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 8px 28px rgba(30, 36, 86, 0.08),
+    0 1px 3px rgba(30, 36, 86, 0.06);
+}
