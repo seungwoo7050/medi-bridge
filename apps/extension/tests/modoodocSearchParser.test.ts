@@ -203,6 +203,7 @@ describe('parseModoodocSearchHtml', () => {
       reviewCount: 20,
       representativeTreatment: '인공눈물 처방',
       representativePrice: null,
+      platformLabel: '모두닥',
     });
   });
 

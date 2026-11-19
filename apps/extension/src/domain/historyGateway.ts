@@ -1,3 +1,4 @@
+import type { HospitalComparisonSummary } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import type {
   HistoryMutation,
@@ -7,6 +8,7 @@ import type {
   RecentHospitalRecord,
 } from '../types/place';
 import {
+  attachComparisonToRecentHospital,
   attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
@@ -16,8 +18,7 @@ import {
 } from './bridgeStorage';
 
 /**
- * 최근 본 병원 기록을 바꾸는 작업을 실제로 실행한다. service worker가 메시지를 받아 호출하고,
- * 모든 갱신이 service worker 한 곳의 쓰기 큐(bridgeStorage.ts)에 줄을 선다.
+ * 최근 본 병원 기록 변경을 실행합니다. Service Worker 단일 쓰기 큐를 거쳐 Lost Update를 차단합니다.
  */
 export async function applyHistoryMutation(
   mutation: HistoryMutation,
@@ -34,13 +35,15 @@ export async function applyHistoryMutation(
       return (await getBridgeState()).recentHospitals;
     case 'attach':
       return attachSummaryToRecentHospital(mutation.name, mutation.regionHint, mutation.summary);
+    case 'attach_comparison':
+      return attachComparisonToRecentHospital(
+        mutation.name,
+        mutation.regionHint,
+        mutation.comparison,
+      );
   }
 }
 
-/**
- * content script와 팝업은 기록을 직접 쓰지 않고 service worker에 맡긴다. 환경마다 쓰기 큐가 따로라
- * 직접 쓰면 서로의 변경을 덮을 수 있기 때문이다. service worker에 닿지 못할 때만 직접 실행한다.
- */
 async function requestHistoryMutation(
   mutation: HistoryMutation,
 ): Promise<readonly RecentHospitalRecord[]> {
@@ -51,7 +54,7 @@ async function requestHistoryMutation(
       return res.recentHospitals;
     }
   } catch {
-    // service worker에 닿지 못하면 아래에서 직접 실행한다.
+    // Service Worker 슬립·미응답 시 로컬 폴백
   }
   return applyHistoryMutation(mutation);
 }
@@ -90,4 +93,12 @@ export function attachSummaryViaWorker(
   summary: ModoodocHospitalSummary,
 ): Promise<readonly RecentHospitalRecord[]> {
   return requestHistoryMutation({ op: 'attach', name, regionHint, summary });
+}
+
+export function attachComparisonViaWorker(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonSummary,
+): Promise<readonly RecentHospitalRecord[]> {
+  return requestHistoryMutation({ op: 'attach_comparison', name, regionHint, comparison });
 }

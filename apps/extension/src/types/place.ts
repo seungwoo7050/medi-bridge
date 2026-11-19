@@ -1,3 +1,22 @@
+import type {
+  ModoodocHospitalSummary,
+  ModoodocPriceBadge,
+  ModoodocPriceItem,
+  ModoodocTreatmentTag,
+} from '@medi-bridge/parsers';
+import type {
+  BoundsClinicInput,
+  BoundsSortBy,
+  HospitalComparisonSummary,
+} from '@medi-bridge/shared';
+
+export type {
+  ModoodocHospitalSummary,
+  ModoodocPriceBadge,
+  ModoodocPriceItem,
+  ModoodocTreatmentTag,
+};
+
 export interface ExtractedHospitalPlace {
   /** 네이버 지도 장소 상세 패널에서 추출된 병원명 */
   readonly name: string;
@@ -33,39 +52,13 @@ export interface CategoryMatchResult {
   readonly matchedDepartment: string | null;
 }
 
-export interface ModoodocTreatmentTag {
-  readonly name: string;
-  readonly count: number;
-}
-
-export type ModoodocPriceBadge = '특가' | '이벤트' | null;
-
-export interface ModoodocPriceItem {
-  readonly name: string;
-  readonly displayPrice: string;
-  readonly originalPrice: string | null;
-  readonly badge: ModoodocPriceBadge;
-  readonly numericPrice: number;
-}
-
-export interface ModoodocHospitalSummary {
-  readonly hospitalId: number;
-  readonly name: string;
-  readonly address: string;
-  readonly detailUrl: string;
-  readonly totalScore: number | null;
-  readonly reviewCount: number;
-  readonly topTreatments: readonly ModoodocTreatmentTag[];
-  readonly topPrices: readonly ModoodocPriceItem[];
-  readonly totalPriceCount: number;
-}
-
 export interface HospitalPreviewSummary {
   readonly detailUrl: string;
   readonly totalScore: number | null;
   readonly reviewCount: number;
   readonly representativeTreatment: string | null;
   readonly representativePrice: string | null;
+  readonly platformLabel?: string | null;
 }
 
 export interface RecentHospitalRecord {
@@ -85,6 +78,12 @@ export interface CachedModoodocEntry {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
+export interface CachedComparisonEntry {
+  readonly key: string;
+  readonly fetchedAt: number;
+  readonly comparison: HospitalComparisonSummary | null;
+}
+
 export interface FetchModoodocSummaryRequest {
   readonly type: 'FETCH_MODOODOC_SUMMARY';
   readonly hospitalName: string;
@@ -97,11 +96,39 @@ export interface FetchModoodocSummaryResponse {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
+export interface FetchHospitalComparisonRequest {
+  readonly type: 'FETCH_HOSPITAL_COMPARISON';
+  readonly hospitalName: string;
+  readonly regionHint: string;
+  readonly department: string;
+  readonly includeVat?: boolean;
+}
+
+export interface FetchHospitalComparisonResponse {
+  readonly ok: boolean;
+  readonly comparison: HospitalComparisonSummary | null;
+  readonly ssrSummary: ModoodocHospitalSummary | null;
+}
+
+export interface CompareBoundsClinicsRequest {
+  readonly type: 'COMPARE_BOUNDS_CLINICS';
+  readonly clinics: readonly BoundsClinicInput[];
+  readonly department?: string;
+  readonly includeVat: boolean;
+  readonly sortBy: BoundsSortBy;
+}
+
+export interface CompareBoundsClinicsResponse {
+  readonly ok: boolean;
+  readonly items: readonly HospitalComparisonSummary[];
+}
+
 export interface OpenModoodocHospitalRequest {
   readonly type: 'OPEN_MODOODOC_HOSPITAL';
   readonly hospitalName: string;
   readonly regionHint: string;
   readonly department: string;
+  readonly targetUrl?: string | null;
 }
 
 export interface OpenModoodocHospitalResponse {
@@ -123,6 +150,12 @@ export type HistoryMutation =
       readonly name: string;
       readonly regionHint: string;
       readonly summary: ModoodocHospitalSummary;
+    }
+  | {
+      readonly op: 'attach_comparison';
+      readonly name: string;
+      readonly regionHint: string;
+      readonly comparison: HospitalComparisonSummary;
     };
 
 export interface MutateHistoryRequest {
@@ -137,5 +170,6 @@ export interface MutateHistoryResponse {
 
 export interface BridgeStorageState {
   readonly bridgeEnabled: boolean;
+  readonly vatIncluded: boolean;
   readonly recentHospitals: readonly RecentHospitalRecord[];
 }

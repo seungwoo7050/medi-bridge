@@ -1,7 +1,14 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { getBridgeState, RECENT_HOSPITALS_KEY, setBridgeEnabled } from '../../domain/bridgeStorage';
+import {
+  BRIDGE_ENABLED_KEY,
+  getBridgeState,
+  RECENT_HOSPITALS_KEY,
+  setBridgeEnabled,
+  setVatIncluded,
+  VAT_INCLUDED_KEY,
+} from '../../domain/bridgeStorage';
 import {
   clearRecentHospitalsViaWorker,
   markHospitalClickedViaWorker,
@@ -9,6 +16,8 @@ import {
 } from '../../domain/historyGateway';
 import { buildModoodocSearchUrl } from '../../domain/modoodocUrl';
 import type { OpenModoodocHospitalRequest, RecentHospitalRecord } from '../../types/place';
+
+const WEB_APP_URL = 'http://localhost:3000';
 
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp);
@@ -37,13 +46,16 @@ async function openExternalTab(url: string): Promise<void> {
 
 export function PopupApp(): React.JSX.Element {
   const [bridgeEnabled, setBridgeEnabledState] = useState<boolean>(true);
+  const [vatIncluded, setVatIncludedState] = useState<boolean>(true);
   const [recentHospitals, setRecentHospitals] = useState<readonly RecentHospitalRecord[]>([]);
   const [searchInput, setSearchInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [showPinTip, setShowPinTip] = useState<boolean>(false);
 
   const loadState = useCallback(async () => {
     const state = await getBridgeState();
     setBridgeEnabledState(state.bridgeEnabled);
+    setVatIncludedState(state.vatIncluded);
     setRecentHospitals(state.recentHospitals);
     setLoading(false);
   }, []);
@@ -58,7 +70,11 @@ export function PopupApp(): React.JSX.Element {
       if (areaName !== 'local') {
         return;
       }
-      if ('bridgeEnabled' in changes || RECENT_HOSPITALS_KEY in changes) {
+      if (
+        BRIDGE_ENABLED_KEY in changes ||
+        VAT_INCLUDED_KEY in changes ||
+        RECENT_HOSPITALS_KEY in changes
+      ) {
         void loadState();
       }
     };
@@ -73,6 +89,12 @@ export function PopupApp(): React.JSX.Element {
     const nextValue = !bridgeEnabled;
     setBridgeEnabledState(nextValue);
     await setBridgeEnabled(nextValue);
+  };
+
+  const handleVatToggle = async () => {
+    const nextValue = !vatIncluded;
+    setVatIncludedState(nextValue);
+    await setVatIncluded(nextValue);
   };
 
   const handleQuickSearch = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -134,15 +156,18 @@ export function PopupApp(): React.JSX.Element {
     <div className="popup-shell">
       <header className="popup-header">
         <div className="popup-brand">
-          <div className="popup-logo" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <title>모두닥 로고</title>
-              <path d="M7.1 3.5H8.9V7.1H12.5V8.9H8.9V12.5H7.1V8.9H3.5V7.1H7.1V3.5Z" fill="white" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="popup-title">모두닥 리뷰 브릿지</h1>
-            <p className="popup-subtitle">네이버 지도 병원 영수증 리뷰 연결</p>
+          <img
+            src="/brand/medi-bridge-symbol.png"
+            alt="메디 브릿지 심볼"
+            className="popup-symbol"
+          />
+          <div className="popup-wordmarks">
+            <img
+              src="/brand/medi-bridge-wordmark-en.png"
+              alt="MEDI BRIDGE"
+              className="popup-wordmark-en"
+            />
+            <p className="popup-subtitle">통합 비급여·이벤트 가격 비교</p>
           </div>
         </div>
 
@@ -150,7 +175,7 @@ export function PopupApp(): React.JSX.Element {
           type="button"
           role="switch"
           aria-checked={bridgeEnabled}
-          aria-label="네이버 지도 내 모두닥 배지 자동 표시"
+          aria-label="네이버 지도 내 메디 브릿지 자동 표시"
           className={`toggle-switch ${bridgeEnabled ? 'is-on' : 'is-off'}`}
           onClick={() => {
             void handleToggle();
@@ -161,12 +186,21 @@ export function PopupApp(): React.JSX.Element {
       </header>
 
       <section className="popup-status-banner">
-        <span className={`status-dot ${bridgeEnabled ? 'is-active' : 'is-paused'}`} />
-        <span className="status-text">
-          {bridgeEnabled
-            ? '네이버 지도에서 병원 배지 자동 표시 중'
-            : '배지 표시가 일시 중지되었습니다'}
-        </span>
+        <div className="status-left">
+          <span className={`status-dot ${bridgeEnabled ? 'is-active' : 'is-paused'}`} />
+          <span className="status-text">
+            {bridgeEnabled ? '지도 위 5개 플랫폼 가격 비교 중' : '지도 오버레이 일시 중지됨'}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={`vat-pill ${vatIncluded ? 'is-on' : 'is-off'}`}
+          onClick={() => {
+            void handleVatToggle();
+          }}
+        >
+          {vatIncluded ? 'VAT 포함' : '표기가'}
+        </button>
       </section>
 
       <section className="popup-section">
@@ -174,10 +208,10 @@ export function PopupApp(): React.JSX.Element {
           <input
             type="text"
             className="search-input"
-            placeholder="병원명 또는 지역+진료과 빠른 검색"
+            placeholder="병원명 또는 시술명 빠른 검색"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            aria-label="모두닥 빠른 검색어"
+            aria-label="메디 브릿지 빠른 검색어"
           />
           <button type="submit" className="search-button">
             검색
@@ -188,7 +222,7 @@ export function PopupApp(): React.JSX.Element {
       <section className="popup-section history-section">
         <div className="section-head">
           <h2 className="section-title">
-            최근 본 병원 · 비교함 <span className="count-pill">{recentHospitals.length}</span>
+            최근 비교 병원 <span className="count-pill">{recentHospitals.length}</span>
           </h2>
           {recentHospitals.length > 0 && (
             <button
@@ -207,8 +241,8 @@ export function PopupApp(): React.JSX.Element {
           <p className="empty-state">불러오는 중...</p>
         ) : recentHospitals.length === 0 ? (
           <div className="empty-state">
-            <p>아직 확인한 병원이 없습니다.</p>
-            <p className="empty-sub">네이버 지도에서 병원을 클릭하면 이곳에 기록됩니다.</p>
+            <p>아직 비교한 병원이 없습니다.</p>
+            <p className="empty-sub">네이버 지도에서 병원을 선택하면 이곳에 정리됩니다.</p>
           </div>
         ) : (
           <ul className="history-list">
@@ -238,16 +272,16 @@ export function PopupApp(): React.JSX.Element {
                       <span>{item.regionHint || '지역 정보 없음'}</span>
                       <span>·</span>
                       <span>{formatRelativeTime(item.viewedAt)}</span>
-                      {item.clickedModoodoc && <span className="visited-pill">모두닥 열어봄</span>}
+                      {item.clickedModoodoc && <span className="visited-pill">상세 열람함</span>}
                     </div>
                     {summary !== null && (
                       <div className="history-summary-row">
+                        {summary.platformLabel && (
+                          <span className="platform-mini">{summary.platformLabel}</span>
+                        )}
                         {summary.totalScore !== null && (
                           <span className="summary-score">★ {summary.totalScore.toFixed(1)}</span>
                         )}
-                        <span className="summary-reviews">
-                          리뷰 {summary.reviewCount.toLocaleString('ko-KR')}건
-                        </span>
                         {repLabel !== null && <span className="summary-treatment">{repLabel}</span>}
                       </div>
                     )}
@@ -268,6 +302,32 @@ export function PopupApp(): React.JSX.Element {
           </ul>
         )}
       </section>
+
+      <footer className="popup-footer">
+        <button
+          type="button"
+          className="web-link-button"
+          onClick={() => {
+            void openExternalTab(WEB_APP_URL);
+          }}
+        >
+          자체 웹에서 전체 비교 ↗
+        </button>
+        <button
+          type="button"
+          className="pin-tip-toggle"
+          onClick={() => setShowPinTip((prev) => !prev)}
+        >
+          {showPinTip ? '고정 안내 닫기' : '툴바 고정 팁'}
+        </button>
+      </footer>
+
+      {showPinTip && (
+        <p className="pin-tip-box">
+          우측 상단 퍼즐 아이콘을 눌러 메디 브릿지를 고정하면 활성(세이지 그린)/일시정지(그레이)
+          아이콘 상태를 바로 볼 수 있습니다.
+        </p>
+      )}
     </div>
   );
 }

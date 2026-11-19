@@ -1,15 +1,17 @@
+import { BrandInfinityIcon } from '@medi-bridge/ui';
 import type React from 'react';
 import { useState } from 'react';
 import { browser } from 'wxt/browser';
 import { buildModoodocSearchUrl } from '../domain/modoodocUrl';
 import type { OpenModoodocHospitalRequest } from '../types/place';
 
-export interface ModoodocListChipProps {
+export interface MediBridgeListChipProps {
   readonly hospitalName: string;
   readonly regionHint: string;
   readonly department: string;
   readonly isVisited?: boolean;
   readonly detailUrl?: string | null;
+  readonly lowestLabel?: string | null;
   readonly onSelect?: () => void;
 }
 
@@ -17,14 +19,15 @@ function stopBubble(event: React.SyntheticEvent): void {
   event.stopPropagation();
 }
 
-export function ModoodocListChip({
+export function MediBridgeListChip({
   hospitalName,
   regionHint,
   department,
   isVisited = false,
   detailUrl = null,
+  lowestLabel = null,
   onSelect,
-}: ModoodocListChipProps): React.JSX.Element {
+}: MediBridgeListChipProps): React.JSX.Element {
   const [opening, setOpening] = useState<boolean>(false);
   const fallbackUrl = buildModoodocSearchUrl(hospitalName, regionHint);
   const targetUrl = detailUrl ?? fallbackUrl;
@@ -69,27 +72,31 @@ export function ModoodocListChip({
   };
 
   return (
-    <div className="modoodoc-list-chip-wrapper">
+    <div className="mb-list-chip-wrapper">
       <a
         href={targetUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`modoodoc-list-chip${isVisited ? ' is-visited' : ''}${opening ? ' is-opening' : ''}`}
-        title={`'${hospitalName}' 모두닥 병원 페이지 보기${isVisited ? ' (열어본 병원)' : ''} (새 탭)`}
-        aria-label={`${hospitalName} 모두닥 리뷰 보기`}
+        className={`mb-list-chip${isVisited ? ' is-visited' : ''}${opening ? ' is-opening' : ''}`}
+        title={`'${hospitalName}' 통합 가격 비교${isVisited ? ' (열람 완료)' : ''} (새 탭)`}
+        aria-label={`${hospitalName} 가격 비교`}
         onPointerDown={stopBubble}
         onMouseDown={stopBubble}
         onClick={handleClick}
       >
         {isVisited ? (
-          <span className="modoodoc-list-chip-check" aria-hidden="true">
+          <span className="mb-list-chip-check" aria-hidden="true">
             ✓
           </span>
         ) : (
-          <span className="modoodoc-list-chip-dot" aria-hidden="true" />
+          <span className="mb-list-chip-icon" aria-hidden="true">
+            <BrandInfinityIcon size={12} />
+          </span>
         )}
-        <span className="modoodoc-list-chip-label">모두닥 리뷰</span>
-        <span className="modoodoc-list-chip-arrow" aria-hidden="true">
+        <span className="mb-list-chip-label">
+          {lowestLabel ? `최저 ${lowestLabel}` : '가격 비교'}
+        </span>
+        <span className="mb-list-chip-arrow" aria-hidden="true">
           ↗
         </span>
       </a>

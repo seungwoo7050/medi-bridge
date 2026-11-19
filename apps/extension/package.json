@@ -15,6 +15,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@medi-bridge/db": "workspace:*",
+    "@medi-bridge/parsers": "workspace:*",
+    "@medi-bridge/shared": "workspace:*",
+    "@medi-bridge/ui": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

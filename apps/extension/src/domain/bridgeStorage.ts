@@ -1,7 +1,9 @@
+import { formatKoreanWon, type HospitalComparisonSummary } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { toHospitalPreviewSummary } from '../adapters/modoodocSearchParser';
 import type {
   BridgeStorageState,
+  CachedComparisonEntry,
   CachedModoodocEntry,
   HospitalPreviewSummary,
   ModoodocHospitalSummary,
@@ -15,8 +17,10 @@ import {
 } from './modoodocUrl';
 
 export const BRIDGE_ENABLED_KEY = 'bridgeEnabled';
+export const VAT_INCLUDED_KEY = 'vatIncluded';
 export const RECENT_HOSPITALS_KEY = 'recentHospitals';
 export const SUMMARY_CACHE_KEY = 'modoodocSummaryCache';
+export const COMPARISON_CACHE_KEY = 'mediBridgeComparisonCache';
 
 export const MAX_RECENT_HOSPITALS = 20;
 export const MAX_SUMMARY_CACHE = 60;
@@ -24,10 +28,7 @@ export const SUMMARY_HIT_TTL_MS = 24 * 60 * 60 * 1000;
 export const SUMMARY_MISS_TTL_MS = 30 * 60 * 1000;
 
 /**
- * storage.local은 읽고 통째로 쓰는 갱신(read-modify-write)이 트랜잭션이 아니라서, 같은 환경 안에서
- * 갱신 둘이 겹치면 나중에 쓴 쪽이 먼저 쓴 쪽의 변경을 덮는다. 모든 갱신을 이 큐로 한 줄에 세운다.
- * 환경(content script, 팝업, service worker)이 달라도 갱신은 service worker 한 곳에서 실행한다
- * (historyGateway.ts).
+ * storage.local은 read-modify-write 트랜잭션을 제공하지 않으므로, 모든 갱신을 Service Worker 단일 FIFO 큐로 직렬화합니다.
  */
 let writeQueue: Promise<unknown> = Promise.resolve();
 
@@ -45,6 +46,20 @@ export interface HospitalHistoryInput {
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+export function comparisonToPreviewSummary(
+  comparison: HospitalComparisonSummary,
+): HospitalPreviewSummary {
+  const lowest = comparison.lowestOffer;
+  return {
+    detailUrl: lowest?.bookingUrl ?? buildModoodocSearchUrl(comparison.name, comparison.sigungu),
+    totalScore: comparison.rating,
+    reviewCount: comparison.reviewCount,
+    representativeTreatment: lowest?.treatmentName ?? null,
+    representativePrice: lowest ? formatKoreanWon(lowest.effectivePrice) : null,
+    platformLabel: lowest?.platformLabel ?? '심평원 대조',
+  };
 }
 
 export function isHospitalPreviewSummary(value: unknown): value is HospitalPreviewSummary {
@@ -120,27 +135,50 @@ function parseSummaryCache(raw: unknown): CachedModoodocEntry[] {
   return raw.filter(isCachedModoodocEntry).slice(0, MAX_SUMMARY_CACHE);
 }
 
-/**
- * 현재 배지 활성화 여부와 최근 본 병원 목록을 스토리지에서 안전하게 읽어옵니다.
- */
+function isCachedComparisonEntry(value: unknown): value is CachedComparisonEntry {
+  if (!isRecordObject(value)) {
+    return false;
+  }
+  return (
+    typeof value.key === 'string' &&
+    typeof value.fetchedAt === 'number' &&
+    (value.comparison === null || isRecordObject(value.comparison))
+  );
+}
+
+function parseComparisonCache(raw: unknown): CachedComparisonEntry[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter(isCachedComparisonEntry).slice(0, MAX_SUMMARY_CACHE);
+}
+
 export async function getBridgeState(): Promise<BridgeStorageState> {
-  const stored = await browser.storage.local.get([BRIDGE_ENABLED_KEY, RECENT_HOSPITALS_KEY]);
+  const stored = await browser.storage.local.get([
+    BRIDGE_ENABLED_KEY,
+    VAT_INCLUDED_KEY,
+    RECENT_HOSPITALS_KEY,
+  ]);
 
   const rawEnabled = stored[BRIDGE_ENABLED_KEY];
+  const rawVat = stored[VAT_INCLUDED_KEY];
   const bridgeEnabled = typeof rawEnabled === 'boolean' ? rawEnabled : true;
+  const vatIncluded = typeof rawVat === 'boolean' ? rawVat : true;
   const recentHospitals = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
 
   return {
     bridgeEnabled,
+    vatIncluded,
     recentHospitals,
   };
 }
 
-/**
- * 네이버 지도 내 배지·미니 버튼 노출 활성화 상태를 저장합니다.
- */
 export async function setBridgeEnabled(enabled: boolean): Promise<void> {
   await browser.storage.local.set({ [BRIDGE_ENABLED_KEY]: enabled });
+}
+
+export async function setVatIncluded(vatIncluded: boolean): Promise<void> {
+  await browser.storage.local.set({ [VAT_INCLUDED_KEY]: vatIncluded });
 }
 
 async function upsertHospitalHistoryUnlocked(
@@ -157,11 +195,27 @@ async function upsertHospitalHistoryUnlocked(
   const id = buildHospitalKey(cleanName, cleanRegion);
   const searchUrl = buildModoodocSearchUrl(cleanName, cleanRegion);
 
-  const stored = await browser.storage.local.get([RECENT_HOSPITALS_KEY, SUMMARY_CACHE_KEY]);
+  const stored = await browser.storage.local.get([
+    RECENT_HOSPITALS_KEY,
+    SUMMARY_CACHE_KEY,
+    COMPARISON_CACHE_KEY,
+  ]);
   const existingList = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
   const existingRecord = existingList.find((item) => item.id === id);
 
   let resolvedSummary = existingRecord?.summary ?? null;
+  if (resolvedSummary === null) {
+    const compCache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+    const compHit = compCache.find((item) => item.key === id);
+    if (
+      compHit &&
+      compHit.comparison !== null &&
+      Date.now() - compHit.fetchedAt < SUMMARY_HIT_TTL_MS
+    ) {
+      resolvedSummary = comparisonToPreviewSummary(compHit.comparison);
+    }
+  }
+
   if (resolvedSummary === null) {
     const cache = parseSummaryCache(stored[SUMMARY_CACHE_KEY]);
     const cachedEntry = cache.find((item) => item.key === id);
@@ -194,28 +248,18 @@ async function upsertHospitalHistoryUnlocked(
   return nextList;
 }
 
-/**
- * 상세 패널에서 병원을 열람했을 때 최근 본 병원 목록 상단에 기록합니다.
- * 기존에 모두닥 버튼을 클릭한 이력과 summary 상태를 보존합니다.
- */
 export async function recordHospitalView(
   input: HospitalHistoryInput,
 ): Promise<readonly RecentHospitalRecord[]> {
   return enqueueWrite(() => upsertHospitalHistoryUnlocked(input, false));
 }
 
-/**
- * 사용자가 [모두닥 영수증 리뷰 보기] 배지 또는 미니 버튼을 클릭했을 때 clickedModoodoc을 true로 기록합니다.
- */
 export async function markHospitalClicked(
   input: HospitalHistoryInput,
 ): Promise<readonly RecentHospitalRecord[]> {
   return enqueueWrite(() => upsertHospitalHistoryUnlocked(input, true));
 }
 
-/**
- * 최근 본 병원 목록에서 특정 항목만 제거합니다.
- */
 async function removeRecentHospitalUnlocked(id: string): Promise<readonly RecentHospitalRecord[]> {
   const stored = await browser.storage.local.get(RECENT_HOSPITALS_KEY);
   const existingList = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
@@ -224,17 +268,10 @@ async function removeRecentHospitalUnlocked(id: string): Promise<readonly Recent
   return nextList;
 }
 
-/**
- * 최근 본 병원 목록 전체를 비웁니다.
- */
 async function clearRecentHospitalsUnlocked(): Promise<void> {
   await browser.storage.local.set({ [RECENT_HOSPITALS_KEY]: [] });
 }
 
-/**
- * Popup 등에서 배지 ON/OFF 상태를 변경할 때 실시간으로 알림을 받습니다.
- * 반환된 함수를 호출해 구독을 해제할 수 있습니다.
- */
 export function subscribeBridgeEnabled(onChange: (enabled: boolean) => void): () => void {
   const listener = (
     changes: Record<string, { newValue?: unknown; oldValue?: unknown }>,
@@ -255,9 +292,26 @@ export function subscribeBridgeEnabled(onChange: (enabled: boolean) => void): ()
   };
 }
 
-/**
- * 최근 본 병원 목록 변경 사항을 실시간으로 구독합니다.
- */
+export function subscribeVatIncluded(onChange: (vatIncluded: boolean) => void): () => void {
+  const listener = (
+    changes: Record<string, { newValue?: unknown; oldValue?: unknown }>,
+    areaName: string,
+  ) => {
+    if (areaName !== 'local') {
+      return;
+    }
+    const change = changes[VAT_INCLUDED_KEY];
+    if (change && typeof change.newValue === 'boolean') {
+      onChange(change.newValue);
+    }
+  };
+
+  browser.storage.onChanged.addListener(listener);
+  return () => {
+    browser.storage.onChanged.removeListener(listener);
+  };
+}
+
 export function subscribeRecentHospitals(
   onChange: (records: readonly RecentHospitalRecord[]) => void,
 ): () => void {
@@ -280,10 +334,6 @@ export function subscribeRecentHospitals(
   };
 }
 
-/**
- * 로컬 캐시에서 모두닥 병원 요약 정보를 조회합니다.
- * 만료된 항목은 hit: false로 반환합니다.
- */
 export async function getCachedHospitalSummary(
   name: string,
   regionHint: string,
@@ -302,7 +352,6 @@ export async function getCachedHospitalSummary(
 
   const age = Date.now() - entry.fetchedAt;
   const maxTtl = entry.summary !== null ? SUMMARY_HIT_TTL_MS : SUMMARY_MISS_TTL_MS;
-
   if (age >= maxTtl) {
     return { hit: false, summary: null };
   }
@@ -310,9 +359,31 @@ export async function getCachedHospitalSummary(
   return { hit: true, summary: entry.summary };
 }
 
-/**
- * 모두닥 병원 요약 정보를 로컬 캐시에 저장합니다 (최대 60건, 읽어도 순서가 바뀌지 않으므로 오래 저장된 항목부터 밀려남).
- */
+export async function getCachedHospitalComparison(
+  name: string,
+  regionHint: string,
+): Promise<{ hit: boolean; comparison: HospitalComparisonSummary | null }> {
+  const cleanName = normalizeHospitalName(name);
+  const cleanRegion = extractRegionHintFromAddress(regionHint);
+  const key = buildHospitalKey(cleanName, cleanRegion);
+
+  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
+  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+  const entry = cache.find((item) => item.key === key);
+
+  if (!entry) {
+    return { hit: false, comparison: null };
+  }
+
+  const age = Date.now() - entry.fetchedAt;
+  const maxTtl = entry.comparison !== null ? SUMMARY_HIT_TTL_MS : SUMMARY_MISS_TTL_MS;
+  if (age >= maxTtl) {
+    return { hit: false, comparison: null };
+  }
+
+  return { hit: true, comparison: entry.comparison };
+}
+
 async function setCachedHospitalSummaryUnlocked(
   name: string,
   regionHint: string,
@@ -324,29 +395,45 @@ async function setCachedHospitalSummaryUnlocked(
 
   const stored = await browser.storage.local.get(SUMMARY_CACHE_KEY);
   const cache = parseSummaryCache(stored[SUMMARY_CACHE_KEY]);
-
   const newEntry: CachedModoodocEntry = {
     key,
     fetchedAt: Date.now(),
     summary,
   };
-
   const nextCache = [newEntry, ...cache.filter((item) => item.key !== key)].slice(
     0,
     MAX_SUMMARY_CACHE,
   );
-
   await browser.storage.local.set({ [SUMMARY_CACHE_KEY]: nextCache });
 }
 
-/**
- * 최근 본 병원 목록에 존재하는 항목에 모두닥 요약 정보(미리보기용)를 첨부합니다.
- * 항목이 존재할 때만 업데이트하고 저장합니다.
- */
-async function attachSummaryToRecentHospitalUnlocked(
+async function setCachedHospitalComparisonUnlocked(
   name: string,
   regionHint: string,
-  summary: ModoodocHospitalSummary,
+  comparison: HospitalComparisonSummary | null,
+): Promise<void> {
+  const cleanName = normalizeHospitalName(name);
+  const cleanRegion = extractRegionHintFromAddress(regionHint);
+  const key = buildHospitalKey(cleanName, cleanRegion);
+
+  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
+  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+  const newEntry: CachedComparisonEntry = {
+    key,
+    fetchedAt: Date.now(),
+    comparison,
+  };
+  const nextCache = [newEntry, ...cache.filter((item) => item.key !== key)].slice(
+    0,
+    MAX_SUMMARY_CACHE,
+  );
+  await browser.storage.local.set({ [COMPARISON_CACHE_KEY]: nextCache });
+}
+
+async function attachPreviewToRecentHospitalUnlocked(
+  name: string,
+  regionHint: string,
+  preview: HospitalPreviewSummary,
 ): Promise<readonly RecentHospitalRecord[]> {
   const cleanName = normalizeHospitalName(name);
   const cleanRegion = extractRegionHintFromAddress(regionHint);
@@ -367,7 +454,7 @@ async function attachSummaryToRecentHospitalUnlocked(
 
   const updatedItem: RecentHospitalRecord = {
     ...targetItem,
-    summary: toHospitalPreviewSummary(summary),
+    summary: preview,
   };
 
   const nextList = [
@@ -380,23 +467,14 @@ async function attachSummaryToRecentHospitalUnlocked(
   return nextList;
 }
 
-/**
- * 최근 본 병원 목록에서 특정 항목만 제거합니다.
- */
 export function removeRecentHospital(id: string): Promise<readonly RecentHospitalRecord[]> {
   return enqueueWrite(() => removeRecentHospitalUnlocked(id));
 }
 
-/**
- * 최근 본 병원 목록 전체를 비웁니다.
- */
 export function clearRecentHospitals(): Promise<void> {
   return enqueueWrite(() => clearRecentHospitalsUnlocked());
 }
 
-/**
- * 모두닥 병원 요약 정보를 로컬 캐시에 저장합니다.
- */
 export function setCachedHospitalSummary(
   name: string,
   regionHint: string,
@@ -405,13 +483,30 @@ export function setCachedHospitalSummary(
   return enqueueWrite(() => setCachedHospitalSummaryUnlocked(name, regionHint, summary));
 }
 
-/**
- * 최근 본 병원 목록에 존재하는 항목에 모두닥 요약 정보(미리보기용)를 첨부합니다.
- */
+export function setCachedHospitalComparison(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonSummary | null,
+): Promise<void> {
+  return enqueueWrite(() => setCachedHospitalComparisonUnlocked(name, regionHint, comparison));
+}
+
 export function attachSummaryToRecentHospital(
   name: string,
   regionHint: string,
   summary: ModoodocHospitalSummary,
 ): Promise<readonly RecentHospitalRecord[]> {
-  return enqueueWrite(() => attachSummaryToRecentHospitalUnlocked(name, regionHint, summary));
+  return enqueueWrite(() =>
+    attachPreviewToRecentHospitalUnlocked(name, regionHint, toHospitalPreviewSummary(summary)),
+  );
+}
+
+export function attachComparisonToRecentHospital(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonSummary,
+): Promise<readonly RecentHospitalRecord[]> {
+  return enqueueWrite(() =>
+    attachPreviewToRecentHospitalUnlocked(name, regionHint, comparisonToPreviewSummary(comparison)),
+  );
 }

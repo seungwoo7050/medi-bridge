@@ -184,6 +184,18 @@ importers:
 
   apps/extension:
     dependencies:
+      '@medi-bridge/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@medi-bridge/parsers':
+        specifier: workspace:*
+        version: link:../../packages/parsers
+      '@medi-bridge/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@medi-bridge/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       react:
         specifier: ^19.0.0
         version: 19.3.1

@@ -7,8 +7,9 @@
   display: block;
 }
 
-.modoodoc-bridge-wrapper,
-.modoodoc-list-chip-wrapper {
+.mb-wrapper,
+.mb-list-chip-wrapper,
+.mb-drawer-shell {
   font-family:
     "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", sans-serif;
@@ -17,7 +18,7 @@
   text-rendering: optimizeLegibility;
 }
 
-.modoodoc-bridge-wrapper {
+.mb-wrapper {
   display: flex;
   align-items: center;
   margin: 8px 0 4px 0;
@@ -25,242 +26,276 @@
   box-sizing: border-box;
 }
 
-/* 1줄 슬림 배지 (로딩 / 미매칭 폴백) */
-.modoodoc-bridge-badge {
+.mb-slim-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 12px;
   border-radius: 9999px;
-  background-color: #f5f3ff;
-  border: 1px solid #ddd6fe;
-  color: #5b36f2;
+  background-color: #eef0fa;
+  border: 1px solid #c7ceeb;
+  color: #1e2456;
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
-  letter-spacing: -0.2px;
   text-decoration: none;
   cursor: pointer;
   box-sizing: border-box;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.1s ease;
-  box-shadow: 0 1px 2px rgba(91, 54, 242, 0.08);
+  box-shadow: 0 2px 8px rgba(30, 36, 86, 0.08);
 }
 
-.modoodoc-bridge-badge:hover {
-  background-color: #ede9fe;
-  border-color: #c4b5fd;
-  color: #4338ca;
+.mb-slim-badge.is-loading {
+  background-color: #f4f6fc;
+  color: #252d6b;
 }
 
-.modoodoc-bridge-badge:active {
-  transform: translateY(0.5px);
-}
-
-.modoodoc-bridge-badge.is-loading {
-  background-color: #faf5ff;
-  border-color: #e9d5ff;
-  color: #7c3aed;
-  opacity: 0.9;
-}
-
-.modoodoc-bridge-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #6c47ff;
-}
-
-.modoodoc-bridge-arrow {
-  font-size: 11px;
-  opacity: 0.8;
-}
-
-/* 3단 인라인 컴팩트 브릿지 카드 */
-.modoodoc-bridge-card {
+/* Medical Bento + Liquid Glass Card */
+.mb-bento-card {
   width: 100%;
   box-sizing: border-box;
-  background-color: #ffffff;
-  border: 1px solid #ddd6fe;
-  border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 1px 3px rgba(91, 54, 242, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid #c7ceeb;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow:
+    0 8px 24px rgba(30, 36, 86, 0.12),
+    0 1px 3px rgba(30, 36, 86, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
-.modoodoc-card-header {
+.mb-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.modoodoc-card-brand {
+.mb-brand-group {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
 
-.modoodoc-card-logo {
+.mb-logo-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #6c47ff;
+  width: 24px;
+  height: 20px;
+  border-radius: 6px;
+  background-color: #1e2456;
+  color: #ffffff;
 }
 
-.modoodoc-card-title {
+.mb-brand-title {
   font-size: 12px;
-  font-weight: 700;
-  color: #5b36f2;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: #1e2456;
 }
 
-.modoodoc-card-score {
-  font-size: 11.5px;
+.mb-rating {
+  font-size: 11px;
   font-weight: 700;
   color: #d97706;
 }
 
-.modoodoc-card-reviews {
+.mb-reviews {
   font-size: 11px;
-  font-weight: 500;
-  color: #52525b;
+  color: #4b5563;
 }
 
-.modoodoc-card-cta {
+.mb-primary-cta {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background-color: #f5f3ff;
-  border: 1px solid #ddd6fe;
-  color: #5b36f2;
+  gap: 3px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background-color: #1e2456;
+  color: #ffffff;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
-  cursor: pointer;
   flex-shrink: 0;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+  cursor: pointer;
 }
 
-.modoodoc-card-cta:hover {
-  background-color: #ede9fe;
-  border-color: #c4b5fd;
-  color: #4338ca;
+.mb-primary-cta:hover {
+  background-color: #252d6b;
 }
 
-.modoodoc-card-tags {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.modoodoc-card-tag {
-  display: inline-block;
-  font-size: 10.5px;
-  line-height: 14px;
-  color: #6b21a8;
-  background-color: #faf5ff;
-  border: 1px solid #f3e8ff;
-  border-radius: 4px;
-  padding: 2px 6px;
-}
-
-.modoodoc-card-prices {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-top: 6px;
-  border-top: 1px solid #f4f4f5;
-}
-
-.modoodoc-price-row {
+.mb-controls-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11.5px;
-  line-height: 15px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background-color: #f4f6fc;
+  border: 1px solid #dfe4f5;
 }
 
-.modoodoc-price-name {
-  color: #27272a;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60%;
+.mb-hira-baseline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
 }
 
-.modoodoc-price-values {
+.mb-hira-label {
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.mb-hira-price {
+  color: #6b7280;
+  font-weight: 700;
+  text-decoration: line-through;
+}
+
+.mb-vat-toggle {
+  border-radius: 9999px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.mb-vat-toggle.is-on {
+  background-color: #2f6f55;
+  color: #ffffff;
+  border-color: #2f6f55;
+}
+
+.mb-vat-toggle.is-off {
+  background-color: #ffffff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.mb-offers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mb-offer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  text-decoration: none;
+  color: #111827;
+  cursor: pointer;
+}
+
+.mb-offer-row.is-lowest {
+  background-color: #eff7f2;
+  border-color: #86b898;
+}
+
+.mb-offer-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.mb-platform-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e2456;
+}
+
+.mb-vat-note {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #92400e;
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.mb-offer-right {
   display: flex;
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
 }
 
-.modoodoc-price-original {
+.mb-savings-pill {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2f6f55;
+  background-color: #dcfce7;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.mb-offer-price {
+  font-size: 12px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.mb-arrow {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.mb-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mb-tag-chip {
   font-size: 10.5px;
-  color: #a1a1aa;
-  text-decoration: line-through;
+  color: #1e2456;
+  background-color: #eef0fa;
+  border: 1px solid #c7ceeb;
+  border-radius: 5px;
+  padding: 2px 6px;
 }
 
-.modoodoc-price-badge {
-  font-size: 9.5px;
-  font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 3px;
-  line-height: 12px;
-}
-
-.modoodoc-price-badge.badge-special {
-  color: #5b36f2;
-  background-color: #ede9fe;
-}
-
-.modoodoc-price-badge.badge-event {
-  color: #047857;
-  background-color: #ecfdf5;
-}
-
-.modoodoc-price-current {
-  font-weight: 700;
-  color: #18181b;
+.mb-ssr-name {
   font-size: 11.5px;
+  font-weight: 500;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.modoodoc-card-more {
+.mb-more-link {
   display: block;
   text-align: right;
   font-size: 10.5px;
-  color: #6c47ff;
+  font-weight: 600;
+  color: #1e2456;
   text-decoration: none;
-  padding-top: 2px;
-  cursor: pointer;
 }
 
-.modoodoc-card-more:hover {
-  text-decoration: underline;
-  color: #4338ca;
-}
-
-/* 검색 목록 미니 칩 (Ghost 스타일) */
-.modoodoc-list-chip-wrapper {
+/* 검색 목록 인라인 칩 */
+.mb-list-chip-wrapper {
   display: flex;
   align-items: center;
   margin: 4px 0 2px 0;
 }
 
-.modoodoc-list-chip {
+.mb-list-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -268,60 +303,255 @@
   padding: 0 9px;
   border-radius: 9999px;
   background-color: #ffffff;
-  border: 1px solid #e4e4e7;
-  color: #52525b;
+  border: 1px solid #c7ceeb;
+  color: #1e2456;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 15px;
-  letter-spacing: -0.2px;
   text-decoration: none;
   cursor: pointer;
   box-sizing: border-box;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
 }
 
-.modoodoc-list-chip:hover {
-  background-color: #f5f3ff;
-  border-color: #c4b5fd;
-  color: #5b36f2;
+.mb-list-chip:hover {
+  background-color: #eef0fa;
+  border-color: #1e2456;
 }
 
-.modoodoc-list-chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background-color: #7c3aed;
-  flex-shrink: 0;
+.mb-list-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #1e2456;
 }
 
-.modoodoc-list-chip-arrow {
+.mb-list-chip.is-visited {
+  background-color: #eff7f2;
+  border-color: #86b898;
+  color: #2f6f55;
+}
+
+.mb-list-chip-check {
   font-size: 10px;
-  opacity: 0.8;
+  font-weight: 800;
 }
 
-.modoodoc-list-chip.is-visited {
-  background-color: #faf5ff;
-  border-color: #ddd6fe;
-  color: #5b36f2;
+.mb-list-chip-arrow {
+  font-size: 10px;
+  opacity: 0.75;
 }
 
-.modoodoc-list-chip.is-visited:hover {
-  background-color: #ede9fe;
-  border-color: #c4b5fd;
-  color: #4338ca;
-}
-
-.modoodoc-list-chip.is-opening {
+.mb-list-chip.is-opening {
   opacity: 0.7;
   pointer-events: none;
 }
 
-.modoodoc-list-chip-check {
-  font-size: 10px;
-  font-weight: 700;
+/* 반경 내 최저가 정렬 플로팅 드로어 (#searchIframe overlay) */
+.mb-drawer-shell {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mb-drawer-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 9999px;
+  border: 1px solid #86b898;
+  background-color: #1e2456;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 6px 20px rgba(30, 36, 86, 0.25);
+  cursor: pointer;
+}
+
+.mb-drawer-trigger:hover {
+  background-color: #252d6b;
+}
+
+.mb-drawer-panel {
+  width: 332px;
+  max-height: 380px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(14px);
+  border: 1px solid #c7ceeb;
+  box-shadow: 0 12px 32px rgba(30, 36, 86, 0.22);
+  overflow: hidden;
+}
+
+.mb-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background-color: #1e2456;
+  color: #ffffff;
+}
+
+.mb-drawer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mb-drawer-title {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mb-drawer-close {
+  border: none;
+  background: transparent;
+  color: #c7ceeb;
+  font-size: 18px;
   line-height: 1;
+  cursor: pointer;
+}
+
+.mb-drawer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  background-color: #f4f6fc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mb-sort-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.mb-sort-tab {
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color: #4b5563;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mb-sort-tab.is-active {
+  background-color: #1e2456;
+  border-color: #1e2456;
+  color: #ffffff;
+}
+
+.mb-drawer-body {
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 280px;
+}
+
+.mb-drawer-status {
+  margin: 12px 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: #4b5563;
+}
+
+.mb-drawer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 11.5px;
+  color: #4b5563;
+}
+
+.mb-drawer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mb-drawer-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mb-drawer-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mb-drawer-clinic-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mb-drawer-rank {
+  width: 17px;
+  height: 17px;
+  border-radius: 9999px;
+  background-color: #1e2456;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+
+.mb-drawer-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mb-drawer-item-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.mb-drawer-offer-desc {
+  color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mb-drawer-price-link {
+  font-weight: 800;
+  color: #2f6f55;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.mb-drawer-price-link:hover {
+  text-decoration: underline;
 }

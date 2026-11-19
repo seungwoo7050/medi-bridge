@@ -53,6 +53,7 @@ import {
   attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
+  getCachedHospitalComparison,
   getCachedHospitalSummary,
   MAX_RECENT_HOSPITALS,
   markHospitalClicked,
@@ -62,9 +63,12 @@ import {
   SUMMARY_HIT_TTL_MS,
   SUMMARY_MISS_TTL_MS,
   setBridgeEnabled,
+  setCachedHospitalComparison,
   setCachedHospitalSummary,
+  setVatIncluded,
   subscribeBridgeEnabled,
   subscribeRecentHospitals,
+  subscribeVatIncluded,
 } from '../src/domain/bridgeStorage';
 import type { ModoodocHospitalSummary } from '../src/types/place';
 
@@ -97,12 +101,29 @@ describe('bridgeStorage', () => {
     vi.useRealTimers();
   });
 
-  it('초기 상태는 bridgeEnabled=true, recentHospitals=[]를 반환한다', async () => {
+  it('초기 상태는 bridgeEnabled=true, vatIncluded=true, recentHospitals=[]를 반환한다', async () => {
     const state = await getBridgeState();
     expect(state).toEqual({
       bridgeEnabled: true,
+      vatIncluded: true,
       recentHospitals: [],
     });
+  });
+
+  it('setVatIncluded와 subscribeVatIncluded가 실시간 VAT 토글 변경을 동기화한다', async () => {
+    const vatCallback = vi.fn();
+    const unsub = subscribeVatIncluded(vatCallback);
+    await setVatIncluded(false);
+    expect(vatCallback).toHaveBeenCalledWith(false);
+    const state = await getBridgeState();
+    expect(state.vatIncluded).toBe(false);
+    unsub();
+  });
+
+  it('병원 비교 캐시(getCachedHospitalComparison/setCachedHospitalComparison)를 저장하고 조회한다', async () => {
+    await setCachedHospitalComparison('강남케이안과의원', '서울 강남구', null);
+    const hit = await getCachedHospitalComparison('강남케이안과의원', '서울 강남구');
+    expect(hit).toEqual({ hit: true, comparison: null });
   });
 
   it('병원 열람과 모두닥 클릭 여부를 LRU 순서로 저장하고 clickedModoodoc 상태를 보존한다', async () => {
@@ -220,6 +241,7 @@ describe('bridgeStorage', () => {
       reviewCount: 10,
       representativeTreatment: '스마일라식',
       representativePrice: '209만원',
+      platformLabel: '모두닥',
     });
 
     // 다시 열람해도 summary가 유지되어야 함

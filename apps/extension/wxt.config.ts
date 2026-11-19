@@ -10,20 +10,27 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: '모두닥 리뷰 브릿지 for 네이버 지도',
-    short_name: '모두닥 브릿지',
+    name: '메디 브릿지 (MEDI BRIDGE) — 네이버 지도 비급여·이벤트 가격 비교',
+    short_name: '메디 브릿지',
     description:
-      '네이버 지도에서 병원의 모두닥 비급여·특가 시술 가격을 미리 확인하고 영수증 인증 리뷰로 바로 이동합니다.',
-    version: '0.2.0',
-    // 최소 권한 원칙: 히스토리·토글 저장을 위한 storage 권한과 네이버 지도·모두닥 호스트만 선언
+      '네이버 지도 위에서 심평원 비급여 정가와 모두닥·강남언니·여신티켓·바비톡·굿닥 이벤트 최저가를 VAT 포함 기준으로 비교합니다.',
+    version: '1.0.0',
+    // 최소 권한 원칙: 로컬 설정·캐시 저장을 위한 storage와 비교 호스트만 선언
     permissions: ['storage'],
     host_permissions: [
       'https://map.naver.com/*',
       'https://pcmap.place.naver.com/*',
       'https://www.modoodoc.com/*',
+      'http://localhost:3000/*',
     ],
     action: {
-      default_title: '모두닥 리뷰 브릿지',
+      default_title: '메디 브릿지 (MEDI BRIDGE)',
+      default_icon: {
+        16: 'icon/active-16.png',
+        32: 'icon/active-32.png',
+        48: 'icon/active-48.png',
+        128: 'icon/active-128.png',
+      },
     },
     icons: {
       16: 'icon/16.png',
