@@ -92,16 +92,6 @@ export function RadiusCompareDrawer({ hospitals }: RadiusCompareDrawerProps): Re
 
   return (
     <div className="mb-drawer-shell">
-      <button
-        type="button"
-        className="mb-drawer-trigger"
-        onClick={handleOpenDrawer}
-        aria-expanded={open}
-      >
-        <BrandInfinityIcon size={16} />
-        <span>현재 화면 병원 최저가 보드 ({hospitals.length}곳)</span>
-      </button>
-
       {open && (
         <section className="mb-drawer-panel" aria-label="현재 지도 반경 최저가 비교 보드">
           <div className="mb-drawer-header">
@@ -204,6 +194,16 @@ export function RadiusCompareDrawer({ hospitals }: RadiusCompareDrawerProps): Re
           </div>
         </section>
       )}
+
+      <button
+        type="button"
+        className="mb-drawer-trigger"
+        onClick={handleOpenDrawer}
+        aria-expanded={open}
+      >
+        <BrandInfinityIcon size={16} />
+        <span>현재 화면 병원 최저가 보드 ({hospitals.length}곳)</span>
+      </button>
     </div>
   );
 }

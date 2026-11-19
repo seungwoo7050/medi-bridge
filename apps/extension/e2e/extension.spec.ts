@@ -9,101 +9,6 @@ const MODOODOC_DETAIL_SLUG = '강남케이안과의원-서울-역삼동';
 const MODOODOC_DETAIL_URL = `https://www.modoodoc.com/hospital/86566/${encodeURIComponent(
   MODOODOC_DETAIL_SLUG,
 )}`;
-const GS_DETAIL_SLUG = '지에스안과의원-서울-역삼동';
-const GS_DETAIL_URL = `https://www.modoodoc.com/hospital/91234/${encodeURIComponent(
-  GS_DETAIL_SLUG,
-)}`;
-
-const MODOODOC_SSR_DATA = {
-  props: {
-    pageProps: {
-      dehydratedState: {
-        queries: [
-          {
-            queryKey: ['hospitalsWithQuery', { searchQuery: '서울 강남구 강남케이안과의원' }],
-            state: {
-              data: {
-                hospitals: [
-                  {
-                    id: 4550,
-                    name: 'YK안과의원',
-                    slug: 'yk안과의원-서울-삼성동',
-                    address: '서울 강남구 삼성2동',
-                    numOfReview: 20,
-                    totalScore: 8.6,
-                    treatments: [{ name: '인공눈물 처방', count: 4 }],
-                    treatmentPrices: [],
-                    hiraTreatmentPrices: [],
-                  },
-                  {
-                    id: 91234,
-                    name: '지에스안과의원',
-                    slug: GS_DETAIL_SLUG,
-                    address: '서울 강남구 역삼1동',
-                    numOfReview: 25,
-                    totalScore: 9.4,
-                    treatments: [{ name: '라섹', count: 12 }],
-                    treatmentPrices: [],
-                    hiraTreatmentPrices: [],
-                  },
-                  {
-                    id: 86566,
-                    name: '강남케이안과의원',
-                    slug: MODOODOC_DETAIL_SLUG,
-                    address: '서울 강남구 역삼1동',
-                    numOfReview: 10,
-                    totalScore: 10,
-                    treatments: [
-                      { name: '스마일라식', count: 9 },
-                      { name: '인공눈물 처방', count: 1 },
-                    ],
-                    treatmentPrices: [
-                      {
-                        treatmentGroup: { name: '시력교정술 검진' },
-                        normalPrice: { lowestPrice: 0, highestPrice: 0 },
-                        eventPrice: null,
-                        specialPrice: null,
-                      },
-                      {
-                        treatmentGroup: { name: '스마일라식' },
-                        normalPrice: { lowestPrice: 3500000, highestPrice: 3500000 },
-                        eventPrice: { lowestPrice: 2090000, highestPrice: 2090000 },
-                        specialPrice: null,
-                      },
-                      {
-                        treatmentGroup: { name: '렌즈삽입술' },
-                        normalPrice: { lowestPrice: 6000000, highestPrice: 6000000 },
-                        eventPrice: { lowestPrice: 4800000, highestPrice: 4800000 },
-                        specialPrice: null,
-                      },
-                      {
-                        treatmentGroup: { name: '아벨리노 DNA 검사' },
-                        normalPrice: { lowestPrice: 100000, highestPrice: 100000 },
-                        eventPrice: null,
-                        specialPrice: null,
-                      },
-                    ],
-                    hiraTreatmentPrices: [],
-                  },
-                ],
-                premiumAdHospitals: [],
-              },
-            },
-          },
-        ],
-      },
-    },
-  },
-};
-
-const MODOODOC_SEARCH_HTML = `<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <script id="__NEXT_DATA__" type="application/json">${JSON.stringify(MODOODOC_SSR_DATA)}</script>
-  </head>
-  <body><h1>모두닥 검색</h1></body>
-</html>`;
 
 const SEARCH_IFRAME_HTML = `<!doctype html>
 <html lang="ko">
@@ -187,7 +92,21 @@ const ENTRY_IFRAME_HTML = `<!doctype html>
 
 const PARENT_MAP_HTML = `<!doctype html>
 <html lang="ko">
-  <head><meta charset="utf-8" /></head>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+      }
+      iframe {
+        border: 0;
+        width: 420px;
+        height: 100vh;
+      }
+    </style>
+  </head>
   <body>
     <iframe id="searchIframe" name="searchIframe" src="https://pcmap.place.naver.com/hospital/list?query=test"></iframe>
     <iframe id="entryIframe" name="entryIframe" src="https://pcmap.place.naver.com/hospital/1399571178/home"></iframe>
@@ -210,8 +129,8 @@ async function resolveExtensionId(context: BrowserContext): Promise<string> {
   return extId;
 }
 
-test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Popup 비교함 및 실시간 토글을 검증한다', async () => {
-  const userDataDir = mkdtempSync(join(tmpdir(), 'modoodoc-e2e-'));
+test('네이버 지도 Medical Bento 비교 카드, VAT 실시간 재정렬, 반경 드로어 및 Popup 토글을 검증한다', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'medi-bridge-e2e-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     channel: 'chromium',
     headless: true,
@@ -238,15 +157,6 @@ test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Po
     });
 
     await context.route('https://www.modoodoc.com/**', async (route) => {
-      const url = route.request().url();
-      if (url.includes('/hospitals/query-search')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'text/html; charset=utf-8',
-          body: MODOODOC_SEARCH_HTML,
-        });
-        return;
-      }
       await route.fulfill({
         status: 200,
         contentType: 'text/html; charset=utf-8',
@@ -258,7 +168,11 @@ test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Po
     if (!bgWorker) {
       bgWorker = await context.waitForEvent('serviceworker', { timeout: 10_000 });
     }
-    await bgWorker.evaluate((mockHtml: string) => {
+
+    // 백엔드 미기동 상태에서도 0건 목록 자동요청 규율 및 로컬 시드 폴백이 동작하도록 카운터 계측
+    await bgWorker.evaluate(() => {
+      const g = globalThis as typeof globalThis & { __boundsCalls?: number };
+      g.__boundsCalls = 0;
       const origFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (
         input: RequestInfo | URL,
@@ -266,127 +180,146 @@ test('네이버 지도 요약 카드·딥링크, 저채도 목록 칩 전환, Po
       ): Promise<Response> => {
         const url =
           typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-        if (url.startsWith('https://www.modoodoc.com/hospitals/query-search')) {
-          return new Response(mockHtml, {
-            status: 200,
-            headers: { 'content-type': 'text/html; charset=utf-8' },
-          });
+        if (url.includes('/api/v1/hospitals/bounds')) {
+          g.__boundsCalls = (g.__boundsCalls ?? 0) + 1;
+        }
+        if (url.startsWith('http://localhost:3000/')) {
+          return new Response(null, { status: 503 });
         }
         return origFetch(input, init);
       };
-    }, MODOODOC_SEARCH_HTML);
-
-    const mapPage = await context.newPage();
-    await mapPage.goto('https://map.naver.com/p/search/test', {
-      waitUntil: 'load',
     });
 
-    await expect
-      .poll(() => mapPage.frame({ name: 'searchIframe' }) !== null, {
-        timeout: 5_000,
-      })
-      .toBe(true);
-    await expect
-      .poll(() => mapPage.frame({ name: 'entryIframe' }) !== null, {
-        timeout: 5_000,
-      })
-      .toBe(true);
+    const mapPage = await context.newPage();
+    await test.step('지도 페이지 이동 및 iframe 로드', async () => {
+      await mapPage.goto('https://map.naver.com/p/search/test', {
+        waitUntil: 'load',
+      });
+
+      await expect
+        .poll(() => mapPage.frame({ name: 'searchIframe' }) !== null, { timeout: 5_000 })
+        .toBe(true);
+      await expect
+        .poll(() => mapPage.frame({ name: 'entryIframe' }) !== null, { timeout: 5_000 })
+        .toBe(true);
+    });
 
     const searchFrame = mapPage.frame({ name: 'searchIframe' });
     const entryFrame = mapPage.frame({ name: 'entryIframe' });
     expect(searchFrame).not.toBeNull();
     expect(entryFrame).not.toBeNull();
+    if (!searchFrame || !entryFrame) return;
 
-    if (!searchFrame || !entryFrame) {
-      return;
-    }
+    await test.step('1. 검색 목록 칩 마운트 및 자동 배치 호출 0건', async () => {
+      const listChipLocator = searchFrame.locator('medi-bridge-list-chip');
+      await expect(listChipLocator).toHaveCount(2, { timeout: 10_000 });
+      await expect(
+        searchFrame.locator('[data-testid="vet-hospital"] medi-bridge-list-chip'),
+      ).toHaveCount(0);
+      await expect(
+        searchFrame.locator('[data-testid="cafe-place"] medi-bridge-list-chip'),
+      ).toHaveCount(0);
 
-    // 1. 검색 목록: 병원 2건에만 Ghost 미니 칩 마운트, 동물병원·카페 미노출
-    const listChipLocator = searchFrame.locator('modoodoc-naver-list-chip');
-    await expect(listChipLocator).toHaveCount(2, { timeout: 10_000 });
-    await expect(
-      searchFrame.locator('[data-testid="vet-hospital"] modoodoc-naver-list-chip'),
-    ).toHaveCount(0);
-    await expect(
-      searchFrame.locator('[data-testid="cafe-place"] modoodoc-naver-list-chip'),
-    ).toHaveCount(0);
+      const initialBoundsCalls = await bgWorker.evaluate(() => {
+        const g = globalThis as typeof globalThis & { __boundsCalls?: number };
+        return g.__boundsCalls ?? 0;
+      });
+      expect(initialBoundsCalls).toBe(0);
+    });
 
-    // 2. 상세 패널: 3단 컴팩트 브릿지 카드 마운트, 가격·시술·상세 페이지 딥링크 검증
-    const entryBadgeHost = entryFrame.locator('modoodoc-naver-bridge');
-    await expect(entryBadgeHost).toHaveCount(1, { timeout: 10_000 });
+    await test.step('2. 상세 패널 Medical Bento 카드 및 VAT 토글 순위 전환', async () => {
+      const entryCard = entryFrame.locator('medi-bridge-entry-card .mb-bento-card');
+      await expect(entryCard).toBeVisible({ timeout: 10_000 });
+      await expect(entryCard.locator('.mb-hira-price')).toContainText('350만원');
 
-    const entryCard = entryFrame.locator('modoodoc-naver-bridge .modoodoc-bridge-card');
-    await expect(entryCard).toBeVisible({ timeout: 10_000 });
-    await expect(entryCard.locator('.modoodoc-card-score')).toContainText('10.0');
-    await expect(entryCard.locator('.modoodoc-card-reviews')).toContainText('10건');
-    await expect(entryCard.locator('.modoodoc-card-tags')).toContainText('#스마일라식');
-    await expect(entryCard.locator('.modoodoc-card-prices')).toContainText('209만원');
-    await expect(entryCard.locator('.modoodoc-card-more')).toContainText('외 1개');
+      const firstRowVatOn = entryCard.locator('.mb-offer-row').first();
+      await expect(firstRowVatOn).toContainText('모두닥');
+      await expect(firstRowVatOn).toContainText('209만원');
 
-    const ctaHref = await entryCard.locator('a.modoodoc-card-cta').getAttribute('href');
-    expect(ctaHref).toBe(MODOODOC_DETAIL_URL);
+      const vatSwitch = entryCard.getByRole('switch', { name: 'VAT 포함 실질가 전환' });
+      await expect(vatSwitch).toHaveAttribute('aria-checked', 'true');
+      await vatSwitch.click();
+      await expect(vatSwitch).toHaveAttribute('aria-checked', 'false');
 
-    // 3. Popup 비교함에서 평점·대표 시술 가격 요약 및 토글 OFF/ON 검증
-    const extId = await resolveExtensionId(context);
+      const firstRowVatOff = entryCard.locator('.mb-offer-row').first();
+      await expect(firstRowVatOff).toContainText('강남언니');
+      await expect(firstRowVatOff).toContainText('195만원');
+
+      await vatSwitch.click();
+      await expect(entryCard.locator('.mb-offer-row').first()).toContainText('모두닥');
+
+      const ctaHref = await entryCard.locator('a.mb-primary-cta').getAttribute('href');
+      expect(ctaHref).toBe(MODOODOC_DETAIL_URL);
+    });
+
+    await test.step('3. 반경 최저가 정렬 드로어 온디맨드 조회', async () => {
+      const drawerTrigger = searchFrame.locator('medi-bridge-radius-drawer .mb-drawer-trigger');
+      await expect(drawerTrigger).toContainText('현재 화면 병원 최저가 보드 (2곳)', {
+        timeout: 5_000,
+      });
+      await drawerTrigger.click({ timeout: 5_000 });
+
+      const drawerPanel = searchFrame.locator('medi-bridge-radius-drawer .mb-drawer-panel');
+      await expect(drawerPanel).toBeVisible({ timeout: 5_000 });
+      await expect(drawerPanel.locator('.mb-drawer-item')).toHaveCount(2, { timeout: 5_000 });
+      await expect(drawerPanel.locator('.mb-drawer-name').first()).toContainText('지에스안과의원', {
+        timeout: 5_000,
+      });
+
+      await drawerPanel.getByRole('tab', { name: '평점순' }).click({ timeout: 5_000 });
+      await expect(drawerPanel.locator('.mb-drawer-name').first()).toContainText(
+        '강남케이안과의원',
+        { timeout: 5_000 },
+      );
+    });
+
+    const extId = await test.step('3b. 확장 ID 추출', async () => {
+      const workerHost = new URL(bgWorker.url()).host;
+      return workerHost || resolveExtensionId(context);
+    });
     const popupPage = await context.newPage();
-    await popupPage.goto(`chrome-extension://${extId}/popup.html`, {
-      waitUntil: 'domcontentloaded',
+    await test.step('4. Popup 비교함 및 ON/OFF 토글', async () => {
+      await popupPage.goto(`chrome-extension://${extId}/popup.html`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      await expect(popupPage.locator('.history-name')).toContainText(['강남케이안과의원']);
+
+      const overlaySwitch = popupPage.getByRole('switch', {
+        name: '네이버 지도 내 메디 브릿지 자동 표시',
+      });
+      await expect(overlaySwitch).toHaveAttribute('aria-checked', 'true');
+      await overlaySwitch.click();
+      await expect(overlaySwitch).toHaveAttribute('aria-checked', 'false');
+
+      await expect(entryFrame.locator('medi-bridge-entry-card')).toHaveCount(0, { timeout: 5_000 });
+      await expect(searchFrame.locator('medi-bridge-list-chip')).toHaveCount(0, { timeout: 5_000 });
+      await expect(searchFrame.locator('medi-bridge-radius-drawer')).toHaveCount(0, {
+        timeout: 5_000,
+      });
+
+      await overlaySwitch.click();
+      await expect(entryFrame.locator('medi-bridge-entry-card .mb-bento-card')).toHaveCount(1, {
+        timeout: 5_000,
+      });
+      await expect(searchFrame.locator('medi-bridge-list-chip')).toHaveCount(2, { timeout: 5_000 });
     });
 
-    await expect(popupPage.locator('.history-name')).toContainText(['강남케이안과의원']);
-    await expect(popupPage.locator('.history-summary-row')).toContainText('10.0');
-    await expect(popupPage.locator('.history-summary-row')).toContainText('스마일라식 209만원');
+    await test.step('5. 상세 CTA 클릭 시 새 탭 및 방문 상태 기록', async () => {
+      const [newTab] = await Promise.all([
+        context.waitForEvent('page', { timeout: 10_000 }),
+        entryFrame.locator('medi-bridge-entry-card a.mb-primary-cta').click(),
+      ]);
+      await newTab.waitForLoadState('domcontentloaded');
+      expect(newTab.url()).toBe(MODOODOC_DETAIL_URL);
 
-    const toggleSwitch = popupPage.getByRole('switch');
-    await expect(toggleSwitch).toHaveAttribute('aria-checked', 'true');
-    await toggleSwitch.click();
-    await expect(toggleSwitch).toHaveAttribute('aria-checked', 'false');
+      await expect(popupPage.locator('.visited-pill').first()).toContainText('상세 열람함');
 
-    await expect(entryFrame.locator('modoodoc-naver-bridge')).toHaveCount(0, {
-      timeout: 5_000,
+      const organicChip = searchFrame.locator(
+        '[data-testid="organic-hospital"] medi-bridge-list-chip a.mb-list-chip',
+      );
+      await expect(organicChip).toHaveClass(/is-visited/, { timeout: 5_000 });
     });
-    await expect(searchFrame.locator('modoodoc-naver-list-chip')).toHaveCount(0, {
-      timeout: 5_000,
-    });
-
-    await toggleSwitch.click();
-    await expect(entryFrame.locator('modoodoc-naver-bridge .modoodoc-bridge-card')).toHaveCount(1, {
-      timeout: 5_000,
-    });
-    await expect(searchFrame.locator('modoodoc-naver-list-chip')).toHaveCount(2, {
-      timeout: 5_000,
-    });
-
-    // 4. 미열람 검색 목록 칩 클릭 시 상세 페이지 직결 + 방문 상태('모두닥 리뷰' 유지 / Popup '모두닥 열어봄') 검증
-    const adChip = searchFrame.locator(
-      '[data-testid="ad-hospital"] modoodoc-naver-list-chip a.modoodoc-list-chip',
-    );
-    const [gsTab] = await Promise.all([context.waitForEvent('page'), adChip.click()]);
-    await gsTab.waitForLoadState('domcontentloaded');
-    expect(gsTab.url()).toBe(GS_DETAIL_URL);
-
-    await expect(adChip).toHaveClass(/is-visited/, { timeout: 5_000 });
-    await expect(adChip).toContainText('모두닥 리뷰');
-    await expect(adChip).not.toContainText('리뷰 확인함');
-    expect(await adChip.getAttribute('href')).toBe(GS_DETAIL_URL);
-
-    // 5. 카드 [리뷰 보기 ↗] 클릭 시 상세 페이지 직결 + Popup/목록 칩 방문 표시 실시간 전환
-    const [newTab] = await Promise.all([
-      context.waitForEvent('page'),
-      entryFrame.locator('modoodoc-naver-bridge a.modoodoc-card-cta').click(),
-    ]);
-    await newTab.waitForLoadState('domcontentloaded');
-    expect(newTab.url()).toBe(MODOODOC_DETAIL_URL);
-
-    await expect(popupPage.locator('.visited-pill').first()).toContainText('모두닥 열어봄');
-    await expect(popupPage.locator('text=리뷰 확인함')).toHaveCount(0);
-
-    const organicChip = searchFrame.locator(
-      '[data-testid="organic-hospital"] modoodoc-naver-list-chip a.modoodoc-list-chip',
-    );
-    await expect(organicChip).toHaveClass(/is-visited/, { timeout: 5_000 });
-    await expect(organicChip).toContainText('모두닥 리뷰');
-    expect(await organicChip.getAttribute('href')).toBe(MODOODOC_DETAIL_URL);
   } finally {
     await context.close();
     rmSync(userDataDir, { recursive: true, force: true });

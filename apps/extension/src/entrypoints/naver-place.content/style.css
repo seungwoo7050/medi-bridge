@@ -377,8 +377,8 @@
 }
 
 .mb-drawer-panel {
-  width: 332px;
-  max-height: 380px;
+  width: min(332px, calc(100vw - 28px));
+  max-height: min(380px, calc(100vh - 76px));
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -451,9 +451,10 @@
 }
 
 .mb-drawer-body {
+  flex: 1;
+  min-height: 0;
   padding: 10px;
   overflow-y: auto;
-  max-height: 280px;
 }
 
 .mb-drawer-status {
