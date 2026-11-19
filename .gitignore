@@ -2,15 +2,26 @@
 node_modules/
 .pnpm-store/
 
-# WXT build & generated types
+# Build & workspace artifacts
+.turbo/
+.next/
 .output/
 output/
+dist/
 .wxt/
+apps/extension/.output/
+apps/extension/output/
+apps/extension/.wxt/
+apps/web/.next/
+apps/web/out/
 
 # Test & coverage
 coverage/
 playwright-report/
 test-results/
+apps/*/playwright-report/
+apps/*/test-results/
+*.tsbuildinfo
 
 # OS & Editor
 .DS_Store
