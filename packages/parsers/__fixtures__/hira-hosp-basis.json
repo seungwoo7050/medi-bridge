@@ -1,0 +1,36 @@
+{
+  "response": {
+    "header": {
+      "resultCode": "00"
+    },
+    "body": {
+      "totalCount": 2,
+      "items": {
+        "item": [
+          {
+            "ykiho": "JDQ4MTg4MTI1MDA1",
+            "yadmNm": "강남케이안과의원",
+            "clCdNm": "의원",
+            "sidoCdNm": "서울",
+            "sgguCdNm": "강남구",
+            "addr": "서울특별시 강남구 강남대로 374, 13층",
+            "XPos": 127.0281,
+            "YPos": 37.4963,
+            "dgsbjtCdNm": "안과"
+          },
+          {
+            "ykiho": "JDQ4MTg4MTI1MDA2",
+            "yadmNm": "연세봄피부과의원",
+            "clCdNm": "의원",
+            "sidoCdNm": "서울",
+            "sgguCdNm": "서초구",
+            "addr": "서울특별시 서초구 강남대로 411",
+            "XPos": 127.0265,
+            "YPos": 37.4988,
+            "dgsbjtCdNm": "피부과"
+          }
+        ]
+      }
+    }
+  }
+}

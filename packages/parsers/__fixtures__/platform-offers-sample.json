@@ -1,0 +1,26 @@
+{
+  "offers": [
+    {
+      "id": "gu-smile-1",
+      "platform": "gangnamunni",
+      "hospitalName": "강남케이안과의원",
+      "hospitalAddress": "서울 강남구 강남대로 374",
+      "title": "[특가] 스마일라식 양안 이벤트 (VAT별도)",
+      "price": 1950000,
+      "isSpecial": true,
+      "bookingUrl": "https://www.gangnamunni.com/events/86566",
+      "updatedAt": "2026-11-19"
+    },
+    {
+      "id": "ys-inmode-1",
+      "platform": "yeoshin",
+      "hospitalName": "연세봄피부과의원",
+      "hospitalAddress": "서울 서초구 강남대로 411",
+      "title": "[첫방문] 인모드 FX 풀페이스 (VAT별도)",
+      "price": 160000,
+      "isFirstVisit": true,
+      "bookingUrl": "https://www.yeoshin.co.kr/events/201",
+      "updatedAt": "2026-11-19"
+    }
+  ]
+}
