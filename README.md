@@ -1,58 +1,59 @@
-# 모두닥 리뷰 브릿지 for 네이버 지도
+# MEDI BRIDGE (메디 브릿지)
 
-네이버 지도에서 병원을 찾을 때 **비급여 및 특가 시술 가격과 대표 시술을 상세 패널 안에서 먼저 확인**하고, 클릭 한 번으로 **해당 병원의 모두닥 상세 및 영수증 리뷰 페이지**로 이동할 수 있는 Chrome Extension(Manifest V3)입니다.
+네이버 지도 위에서 건강보험심사평가원(심평원) 비급여 진료비 신고 정가와 여러 미용·진료 플랫폼의 이벤트 가격을 한 화면에서 대조하고, 자체 반응형 웹으로도 병원별 실질 결제 금액을 비교할 수 있는 Chrome Extension(MV3) + Next.js 모노레포 프로젝트입니다.
 
-![모두닥 리뷰 브릿지 시연](./docs/demo.gif)
+![메디 브릿지 웹 및 Medical Bento 가격 비교 화면](./assets/preview.png)
 
 ---
 
-## 왜 만들었나
+## 왜 단일 브릿지에서 통합 비교기로 전환했는가
 
-병원 위치와 진료 시간을 확인할 때 많은 사용자가 네이버 지도를 먼저 엽니다. 다만 포털 지도만으로는 비급여 시술 가격대나 실제 내원 환자의 평가 감각을 잡기 어렵습니다. 그렇다고 개별 리뷰 본문이 회원 로그인 뒤에만 열리는 모두닥(`modoodoc.com`)에 매번 직접 들어가 검색부터 다시 하는 과정은 탐색 흐름이 끊기기 쉽습니다.
+기존 `modoodoc-naver-bridge`는 네이버 지도에서 모두닥 상세 페이지로 바로 넘겨 주는 단일 플랫폼 브릿지였습니다. 하지만 실제 병원 가격 비교를 할 때는 모두닥 외에도 강남언니, 여신티켓, 바비톡, 굿닥의 이벤트 공지를 번갈아 확인해야 하고, 광고 표기 가격에 부가가치세(VAT 10%) 포함 여부가 제각각 섞여 있어 실제 결제 기준 순위를 한눈에 가늠하기 어렵습니다.
 
-이 확장프로그램은 역할을 나누어 두 서비스가 자연스럽게 이어지도록 설계했습니다.
+`MEDI BRIDGE`는 이 문제를 해결하기 위해 세 가지를 중심에 두고 확장했습니다.
 
-- **네이버 지도 내부**: 공개된 모두닥 평점, 인증 리뷰 건수, 환자 다빈도 시술 태그, 비급여, 이벤트, 특가 가격표 요약 제공
-- **모두닥 새 탭**: 상세 페이지(`/hospital/{id}/{slug}`)로 바로 이동해 로그인 후 실방문자 영수증 리뷰 본문 확인
+1. **기준선과 이벤트가의 동시 비교**: 모든 병·의원이 법적으로 공개하는 심평원 비급여 정가를 기준선으로 두고, 5개 플랫폼(모두닥, 강남언니, 여신티켓, 바비톡, 굿닥)의 이벤트·할인가를 같은 표준 시술 키 아래 정렬합니다.
+2. **VAT 10% 실질가 정규화**: `vatIncluded: false`로 게시된 이벤트가는 `1.1`을 곱해 VAT 포함 실질 결제 금액으로 환산하고, 사용자가 상세 카드와 드로어, 웹 시뮬레이터에서 `VAT 포함` 토글로 순위 변화를 즉시 확인할 수 있습니다.
+3. **네이버 지도 오버레이 + 자체 반응형 웹 이중 접점**: 지도 탐색 중에는 확장프로그램의 Shadow DOM Bento 카드와 반경 최저가 드로어가 바로 동작하고, 검색·공유·상세 비교는 Next.js 웹 앱과 정규화 API(`/api/v1/*`)가 담당합니다.
 
 ---
 
 ## 주요 기능
 
-- **병원 상세 패널 요약 카드 (`#entryIframe`)**:
-  - **1단 헤더**: 모두닥 평점(`★ 10.0`), 인증리뷰 건수, 해당 병원 상세 페이지로 바로 이동하는 `[리뷰 보기 ↗]` 버튼
-  - **2단 다빈도 시술 태그**: 리뷰에서 많이 언급된 대표 시술(최대 3개, 예: `#스마일라식 9`)
-  - **3단 비급여 및 특가 가격표**: 시술별 정상가, 이벤트가, 특가 요약(최대 3행)과 추가 가격 확인 링크
-  - 가격표가 없는 일반 동네 의원은 평점과 시술 태그 카드로, 모두닥 미등록 병원은 1줄 슬림 검색 배지로 단계별 축소 렌더링됩니다.
-- **검색 결과 목록 미니 칩 (`#searchIframe`)**: 병원명 아래에 시선 분산을 줄인 무채색 `[모두닥 리뷰 ↗]` 칩을 띄우고, 클릭 시 해당 병원의 모두닥 상세 페이지를 온디맨드로 열어주며 열어본 병원은 `[✓ 모두닥 리뷰 ↗]`로 표시합니다.
-- **비대상 업종 필터링**: 치과, 피부과, 안과, 정형외과, 한의원 등 핵심 진료과와 병의원은 허용하고, 동물병원, 약국, 요양병원, 산후조리원, 피부관리실 등은 제외합니다.
-- **툴바 팝업 후보 병원 비교함**: 확장 아이콘을 누르면 배지 자동 표시를 켜고 끌 수 있고(열려 있는 탭에 즉시 반영), 빠른 검색창과 함께 최근 본 병원 최대 20건의 `★ 평점 | 리뷰 수 | 대표 시술 최저가`를 한눈에 비교할 수 있습니다.
+### 1. Chrome Extension MV3 (`apps/extension`)
+- **상세 패널 Medical Bento 비교 카드 (`#entryIframe`)**: 심평원 정가 대비 할인율 배지, `VAT 포함 / 표기가` 전환 스위치, 플랫폼별 실질 최저가 순위표(1위 하이라이트) 및 예약처 직행 링크를 Shadow DOM 내부에 독립 마운트합니다.
+- **검색 목록 Ghost 칩 및 반경 최저가 드로어 (`#searchIframe`)**: 목록 초기 로딩에서는 외부 API를 호출하지 않고(자동 호출 0건) 심평원 기준 칩만 붙이며, 사용자가 좌측 하단 플로팅 드로어를 열 때만 반경 내 병원을 온디맨드로 조회해 최저가순·할인율순·평점순으로 정렬합니다.
+- **Dual-Source 조회 및 장애 안전성**: 백엔드 API(`/api/v1/hospitals/match`) 조회를 우선 시도하되 실패 시 브라우저 안전 시드(`@medi-bridge/db/seed`)와 모두닥 SSR 파서(`__NEXT_DATA__`) 폴백으로 이어집니다. `parse_error` 응답은 캐시에 저장하지 않고, 동일 병원 중복 요청은 `inFlight` 맵으로 합치며, 스토리지 기록은 `enqueueWrite` 직렬 큐로 경합을 막습니다.
+- **Popup 비교함 및 툴바 상태 아이콘**: 오버레이 ON/OFF 토글에 따라 확장 툴바 아이콘을 활성/비활성 리소스로 전환하고, 최근 본 병원 최대 20건 비교함과 자체 웹(`localhost:3000` / `/intro`) 바로가기를 제공합니다.
+
+### 2. 자체 비교 웹 및 API (`apps/web`)
+- **반응형 비교 보드 (`/`)**: 진료과·지역 필터, 검색어 입력, VAT 포함 토글, 좌표 핀 뷰어, 심평원 정가 대비 플랫폼 최저가 카드를 제공합니다.
+- **병원 상세 (`/hospitals/[slug]`) 및 홍보 시뮬레이터 (`/intro`)**: 병원별 전체 시술·플랫폼 비교표와 VAT 별도 광고가 실질가 순위에서 어떻게 뒤집히는지 체험할 수 있는 인터랙티브 시뮬레이터, 확장프로그램 권한 안내(`/privacy`)를 제공합니다.
+- **정규화 조회 API (`/api/v1/*`)**:
+  - `POST /api/v1/hospitals/match`: 병원명, 지역 힌트, 좌표, VAT 기준을 받아 단일 병원 매칭 결과 반환
+  - `POST /api/v1/hospitals/bounds`: 현재 지도 반경 내 병원 배열과 정렬 기준(`lowest_price`, `discount_rate`, `rating`)을 받아 비교 순위 반환
+  - `GET /api/v1/treatments`: 표준 시술 카테고리 및 키워드 목록 반환
 
 ---
 
-## 구조와 설계 판단
+## 모노레포 구조
 
 ```text
-src/
-├── types/          # 도메인, DOM 추출, 모두닥 요약, 스토리지 타입 정의
-├── domain/         # 진료과 필터, 모두닥 URL 빌더, browser.storage.local TTL 캐시와 히스토리
-├── adapters/       # 네이버 지도 이중 프레임 DOM 파서 + 모두닥 SSR(__NEXT_DATA__) 파서
-├── components/     # Shadow DOM 내부에 렌더링되는 React 카드, 배지, Ghost 칩
-├── entrypoints/
-│   ├── background.ts         # 단건 온디맨드 조회 + in-flight 중복 제거 프록시
-│   ├── naver-place.content/  # allFrames Content Script (디바운스 MutationObserver + Shadow UI)
-│   └── popup/                # 확장프로그램 툴바 팝업 비교함 React UI
-e2e/                # Playwright 기반 크롬 확장프로그램 E2E 테스트
+medi-bridge/
+├── apps/
+│   ├── extension/        # WXT + React 19 Chrome Extension MV3 (Shadow DOM UI, Background SW, Popup)
+│   └── web/              # Next.js 16 App Router 웹 비교 보드, /intro 시뮬레이터, /api/v1/* 엔드포인트
+├── packages/
+│   ├── shared/           # Zod 스키마, VAT +10% 정규화, 표준 시술 키, ykiho·좌표(Haversine) 매칭기
+│   ├── parsers/          # 심평원(HIRA) 공공데이터·모두닥 SSR 파서, 5개 플랫폼 오퍼 정규화기
+│   ├── db/               # Drizzle PostgreSQL 스키마, 브라우저 안전 시드(@medi-bridge/db/seed), Repository
+│   └── ui/               # Medical Bento 디자인 토큰(Deep Indigo / Mint / Slate) 및 공용 배지 컴포넌트
+└── assets/               # README 프리뷰 이미지
 ```
-
-1. **단건 온디맨드 조회와 로컬 TTL 캐시**: 좌측 검색 목록(`#searchIframe`)에서는 외부 네트워크 요청을 전혀 보내지 않고, 사용자가 우측 상세 패널(`#entryIframe`)을 열었을 때만 Background Service Worker가 공개 검색 SSR 페이지 1건을 조회합니다. 결과는 `browser.storage.local`에 매칭 24시간 / 미매칭 30분 TTL(최대 60건 LRU)로 캐싱해 불필요한 서버 트래픽을 막습니다.
-2. **행정구역 및 병원명 교차 검증**: 모두닥 검색 결과 상단에 타 병원이나 광고가 먼저 노출될 수 있어, 병원명 정규화와 시/도와 시/군/구 일치를 검증한 뒤 정확히 매칭된 병원의 `/hospital/{id}/{slug}` 상세 페이지로 직결합니다.
-3. **이중 프레임 감시와 Shadow DOM 격리**: `setInterval` 폴링 대신 `120ms` 디바운스 `MutationObserver`로 SPA 화면 전환을 감지하고, `createShadowRootUi`와 `px` 고정 치수로 호스트 CSS 간섭을 피합니다.
-4. **빌드 출력 경로 `output/`**: Chrome `압축해제된 확장 프로그램을 로드합니다` 파일 선택창에서 숨김 폴더(`.output`)가 보이지 않는 문제를 피하기 위해 일반 폴더(`output/chrome-mv3`)로 출력하도록 설정했습니다.
 
 ---
 
-## 로컬 설치 및 실행 방법
+## 로컬 실행 및 Chrome 로드
 
 사전 요구사항: Node.js 22+, `pnpm`
 
@@ -60,27 +61,37 @@ e2e/                # Playwright 기반 크롬 확장프로그램 E2E 테스트
 # 1. 의존성 설치
 pnpm install
 
-# 2. 프로덕션 빌드 (output/chrome-mv3 생성)
+# 2. 전체 패키지 빌드 (확장프로그램 output/chrome-mv3 + Next.js 프로덕션 빌드)
 pnpm build
 ```
 
-빌드 후 Chrome에서 아래 순서로 로드해 바로 사용할 수 있습니다.
+개발 서버는 앱 단위로 실행할 수 있습니다.
 
-1. 주소창에 `chrome://extensions` 입력 후 이동
-2. 우측 상단 **개발자 모드(Developer mode)** 활성화
-3. 좌측 상단 **압축해제된 확장 프로그램을 로드합니다(Load unpacked)** 클릭 후 `output/chrome-mv3` 폴더 선택
-4. [네이버 지도](https://map.naver.com)에서 치과, 안과, 피부과 등 병원을 검색해 상세 패널 가격 및 시술 요약 카드와 팝업 비교함 동작 확인
+```bash
+# Next.js 비교 웹 개발 서버 (기본 http://localhost:3000)
+pnpm dev:web
 
-(`pnpm zip`을 실행하면 `output/modoodoc-naver-bridge-0.2.0-chrome.zip` 패키지가 생성됩니다.)
+# Chrome Extension WXT 개발 모드
+pnpm dev:ext
+```
+
+빌드된 확장프로그램을 Chrome에 로드하는 순서:
+
+1. 주소창에서 `chrome://extensions` 로 이동합니다.
+2. 우측 상단 **개발자 모드**를 켭니다.
+3. **압축해제된 확장 프로그램을 로드합니다**를 클릭하고 `apps/extension/output/chrome-mv3` 디렉터리를 선택합니다.
+4. [네이버 지도](https://map.naver.com)에서 치과, 안과, 피부과 등을 검색해 상세 비교 카드와 좌측 하단 반경 최저가 보드를 확인합니다.
+
+(`pnpm zip:ext` 명령으로 Chrome 웹스토어 제출용 압축 아카이브를 생성할 수 있습니다.)
 
 ---
 
 ## 검증 명령어
 
 ```bash
-# TypeScript strict 타입 체크 + Biome 린트/포맷 + Vitest 단위 테스트
+# 전체 6개 워크스페이스 TypeScript 타입 체크 + Biome 린트/포맷 + Vitest 단위 테스트
 pnpm verify
 
-# 빌드된 확장프로그램(output/chrome-mv3) Playwright E2E 검증
+# 빌드된 Chrome Extension(Shadow DOM, VAT 토글, 반경 드로어, Popup) + Next.js 웹 Playwright E2E
 pnpm test:e2e
 ```
