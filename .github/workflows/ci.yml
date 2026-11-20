@@ -1,4 +1,4 @@
-# PR과 main 푸시마다: 타입·린트·단위 테스트 → 확장·정적 웹 빌드 및 권한 검사 → Playwright E2E 검증.
+# PR과 main 푸시마다: 타입·린트·단위 테스트 → 확장·정적 웹 빌드 및 권한 검사 → Playwright E2E 검증 → (main) Cloudflare Workers 배포.
 name: CI
 
 on:
@@ -48,6 +48,7 @@ jobs:
             exit 1
           fi
           test -f apps/web/.cf-dist/index.html
+          test -f apps/web/.cf-dist/vat/index.html
           test -f apps/web/.cf-dist/privacy/index.html
 
       - name: Playwright Chromium 설치
@@ -55,6 +56,22 @@ jobs:
 
       - name: Extension MV3 & 정적 웹 Playwright E2E
         run: pnpm test:e2e
+
+      - name: Cloudflare Workers 자동 배포 (main)
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN 시크릿이 미설정 상태여서 자동 배포를 건너뜁니다."
+            exit 0
+          fi
+          if [ -n "$CF_ACCOUNT_ID_SECRET" ]; then
+            export CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID_SECRET"
+          fi
+          npx --yes wrangler@4.146.0 deploy
 
       - name: E2E 실패 시 결과 아티팩트 업로드
         if: failure()
