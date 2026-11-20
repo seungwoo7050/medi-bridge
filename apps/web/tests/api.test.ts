@@ -45,7 +45,7 @@ describe('apps/web API v1 routes', () => {
         body: JSON.stringify({
           clinics: [
             { name: '강남케이안과의원', regionHint: '서울 강남구', department: '안과' },
-            { name: '연세봄피부과의원', regionHint: '서울 서초구', department: '피부과' },
+            { name: '여름의원 강남', regionHint: '서울 서초구', department: '피부과' },
           ],
           includeVat: true,
           sortBy: 'lowest_price',
@@ -55,7 +55,7 @@ describe('apps/web API v1 routes', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.matchedCount).toBe(2);
-    expect(json.items[0].name).toBe('연세봄피부과의원');
+    expect(json.items[0].name).toBe('여름의원 강남');
 
     const bad = await postBounds(
       makeNextRequest('http://localhost:3000/api/v1/hospitals/bounds', {

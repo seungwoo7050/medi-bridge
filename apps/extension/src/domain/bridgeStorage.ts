@@ -1,4 +1,4 @@
-import { formatKoreanWon, type HospitalComparisonSummary } from '@medi-bridge/shared';
+import { formatPriceKRW, type HospitalComparisonSummary } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { toHospitalPreviewSummary } from '../adapters/modoodocSearchParser';
 import type {
@@ -57,8 +57,8 @@ export function comparisonToPreviewSummary(
     totalScore: comparison.rating,
     reviewCount: comparison.reviewCount,
     representativeTreatment: lowest?.treatmentName ?? null,
-    representativePrice: lowest ? formatKoreanWon(lowest.effectivePrice) : null,
-    platformLabel: lowest?.platformLabel ?? '심평원 대조',
+    representativePrice: lowest ? formatPriceKRW(lowest.effectivePrice) : null,
+    platformLabel: lowest?.platformLabel ?? '병원 신고 정가',
   };
 }
 

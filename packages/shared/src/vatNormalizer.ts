@@ -8,6 +8,13 @@ import {
 const VAT_MULTIPLIER = 1.1;
 
 /**
+ * 웹·확장 비교 UI 전반에서 천 단위 콤마가 포함된 원화 문자열(`1,350,000원`)로 통일해 반환합니다.
+ */
+export function formatPriceKRW(price: number): string {
+  return `${Math.max(0, Math.round(price)).toLocaleString('ko-KR')}원`;
+}
+
+/**
  * 한국 원화 금액을 읽기 쉬운 만원/원 단위로 포맷팅합니다.
  */
 export function formatKoreanWon(amount: number, hasRange = false): string {

@@ -230,11 +230,11 @@ test('네이버 지도 Medical Bento 비교 카드, VAT 실시간 재정렬, 반
     await test.step('2. 상세 패널 Medical Bento 카드 및 VAT 토글 순위 전환', async () => {
       const entryCard = entryFrame.locator('medi-bridge-entry-card .mb-bento-card');
       await expect(entryCard).toBeVisible({ timeout: 10_000 });
-      await expect(entryCard.locator('.mb-hira-price')).toContainText('350만원');
+      await expect(entryCard.locator('.mb-hira-price')).toContainText('3,500,000원');
 
       const firstRowVatOn = entryCard.locator('.mb-offer-row').first();
       await expect(firstRowVatOn).toContainText('모두닥');
-      await expect(firstRowVatOn).toContainText('209만원');
+      await expect(firstRowVatOn).toContainText('2,090,000원');
 
       const vatSwitch = entryCard.getByRole('switch', { name: 'VAT 포함 실질가 전환' });
       await expect(vatSwitch).toHaveAttribute('aria-checked', 'true');
@@ -243,7 +243,7 @@ test('네이버 지도 Medical Bento 비교 카드, VAT 실시간 재정렬, 반
 
       const firstRowVatOff = entryCard.locator('.mb-offer-row').first();
       await expect(firstRowVatOff).toContainText('강남언니');
-      await expect(firstRowVatOff).toContainText('195만원');
+      await expect(firstRowVatOff).toContainText('1,950,000원');
 
       await vatSwitch.click();
       await expect(entryCard.locator('.mb-offer-row').first()).toContainText('모두닥');
@@ -262,9 +262,14 @@ test('네이버 지도 Medical Bento 비교 카드, VAT 실시간 재정렬, 반
       const drawerPanel = searchFrame.locator('medi-bridge-radius-drawer .mb-drawer-panel');
       await expect(drawerPanel).toBeVisible({ timeout: 5_000 });
       await expect(drawerPanel.locator('.mb-drawer-item')).toHaveCount(2, { timeout: 5_000 });
-      await expect(drawerPanel.locator('.mb-drawer-name').first()).toContainText('지에스안과의원', {
-        timeout: 5_000,
-      });
+      await expect(drawerPanel.locator('.mb-drawer-name').first()).toContainText(
+        '강남케이안과의원',
+        { timeout: 5_000 },
+      );
+      await expect(drawerPanel.locator('.mb-drawer-name')).toContainText([
+        '강남케이안과의원',
+        '지에스안과의원',
+      ]);
 
       await drawerPanel.getByRole('tab', { name: '평점순' }).click({ timeout: 5_000 });
       await expect(drawerPanel.locator('.mb-drawer-name').first()).toContainText(

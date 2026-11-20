@@ -4,13 +4,15 @@ import type { HospitalComparisonSummary } from '@medi-bridge/shared';
 import {
   computeEffectivePrice,
   computeSavingsVsBaseline,
-  formatKoreanWon,
+  formatPriceKRW,
+  STANDARD_TREATMENTS,
 } from '@medi-bridge/shared';
-import { BestPriceBadge, HiraVerifiedBadge } from '@medi-bridge/ui';
-import { ArrowLeft, ArrowUpRight, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, MapPin, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import type React from 'react';
 import { useMemo, useState } from 'react';
+
+const TREATMENT_META = new Map(STANDARD_TREATMENTS.map((item) => [item.code, item]));
 
 export function HospitalDetailClient({
   clinic,
@@ -18,7 +20,9 @@ export function HospitalDetailClient({
   readonly clinic: HospitalComparisonSummary;
 }): React.JSX.Element {
   const [includeVat, setIncludeVat] = useState<boolean>(true);
-  const [selectedCode, setSelectedCode] = useState<string>('ALL');
+  const [selectedCode, setSelectedCode] = useState<string>(
+    clinic.hiraBaselineItems[0]?.treatmentCode ?? clinic.offers[0]?.treatmentCode ?? '',
+  );
 
   const treatmentCodes = useMemo(() => {
     const map = new Map<string, string>();
@@ -28,35 +32,40 @@ export function HospitalDetailClient({
     return Array.from(map.entries());
   }, [clinic]);
 
-  const normalizedOffers = useMemo(() => {
-    const baselineMap: Record<string, number> = {};
-    for (const b of clinic.hiraBaselineItems) {
-      baselineMap[b.treatmentCode] = b.minPrice;
-    }
+  const effectiveCode = selectedCode || treatmentCodes[0]?.[0] || '';
+  const activeBaseline = useMemo(
+    () => clinic.hiraBaselineItems.find((b) => b.treatmentCode === effectiveCode) ?? null,
+    [clinic.hiraBaselineItems, effectiveCode],
+  );
 
+  const normalizedOffers = useMemo(() => {
     return clinic.offers
-      .filter((o) => selectedCode === 'ALL' || o.treatmentCode === selectedCode)
+      .filter((o) => !effectiveCode || o.treatmentCode === effectiveCode)
       .map((offer) => {
         const effectivePrice = computeEffectivePrice(
           offer.listedPrice,
           offer.vatIncluded,
           includeVat,
         );
-        const baseline = baselineMap[offer.treatmentCode] ?? null;
+        const baselinePrice = activeBaseline?.minPrice ?? null;
         const { savingsAmount, savingsPercent } = computeSavingsVsBaseline(
           effectivePrice,
-          baseline,
+          baselinePrice,
         );
         return {
           ...offer,
           effectivePrice,
-          hiraBaselinePrice: baseline,
+          hiraBaselinePrice: baselinePrice,
           savingsAmount,
           savingsPercent,
         };
       })
       .sort((a, b) => a.effectivePrice - b.effectivePrice);
-  }, [clinic, includeVat, selectedCode]);
+  }, [clinic.offers, effectiveCode, includeVat, activeBaseline]);
+
+  const naverMapUrl = `https://map.naver.com/p/search/${encodeURIComponent(clinic.name)}`;
+  const activeUnitLabel =
+    activeBaseline?.unitLabel ?? TREATMENT_META.get(effectiveCode)?.unitLabel ?? '';
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 space-y-6">
@@ -65,26 +74,46 @@ export function HospitalDetailClient({
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#1E2456]"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        <span>전체 비교 목록으로 돌아가기</span>
+        <span>전체 시술 비교 목록으로</span>
       </Link>
 
-      <section className="rounded-2xl bg-[#1E2456] text-white p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Clinic Header Card (Single accent control, zero eyebrow pills) */}
+      <section className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#252D6B] px-2.5 py-0.5 text-xs font-semibold text-[#86B898]">
-                {clinic.department}
-              </span>
-              {clinic.hiraVerified && <HiraVerifiedBadge />}
-              {clinic.maxSavingsPercent > 0 && (
-                <BestPriceBadge label={`정가 대비 최대 ${clinic.maxSavingsPercent}% 절감`} />
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                {clinic.name}
+              </h1>
+              <span className="text-xs font-medium text-slate-500">{clinic.department}</span>
+              {clinic.rating !== null && (
+                <span className="text-xs font-semibold text-amber-600 tabular-nums">
+                  ★ {clinic.rating.toFixed(1)} ({clinic.reviewCount.toLocaleString('ko-KR')})
+                </span>
               )}
             </div>
-            <h1 className="text-2xl font-extrabold">{clinic.name}</h1>
-            <p className="text-xs text-indigo-100/80">
-              {clinic.roadAddress}
-              {clinic.ykiho && <span className="ml-2 opacity-75">· 요양기호 대조 완료</span>}
-            </p>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span>{clinic.roadAddress}</span>
+              </span>
+              {clinic.subwayInfo && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <span className="font-medium text-slate-700">{clinic.subwayInfo}</span>
+                </>
+              )}
+              <span className="text-slate-300">·</span>
+              <a
+                href={naverMapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[#1E2456] hover:underline"
+              >
+                네이버 지도 ↗
+              </a>
+            </div>
           </div>
 
           <button
@@ -92,112 +121,102 @@ export function HospitalDetailClient({
             role="switch"
             aria-checked={includeVat}
             onClick={() => setIncludeVat((prev) => !prev)}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold cursor-pointer ${
-              includeVat ? 'bg-[#86B898] text-[#142038]' : 'bg-[#252D6B] text-white'
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold border transition cursor-pointer shrink-0 ${
+              includeVat
+                ? 'bg-[#1E2456] text-white border-[#1E2456]'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>{includeVat ? 'VAT 포함 실질가 기준 ON' : '표기가 기준 (VAT 별도)'}</span>
+            <span>{includeVat ? '부가세 10% 포함 실결제가' : '앱 광고 표기가 (부가세 별도)'}</span>
           </button>
         </div>
-      </section>
 
-      {/* HIRA Baselines */}
-      <section className="rounded-2xl bento-glass border border-slate-200 p-5 space-y-3">
-        <h2 className="text-sm font-bold text-[#1E2456]">
-          건강보험심사평가원(심평원) 비급여 신고 정가
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {clinic.hiraBaselineItems.map((item) => (
-            <div
-              key={item.treatmentCode}
-              className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between"
-            >
-              <div>
-                <p className="text-xs font-bold text-slate-900">{item.treatmentName}</p>
-                <p className="text-[11px] text-slate-500">신고일 {item.reportedDate}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-extrabold text-[#1E2456]">
-                  {formatKoreanWon(item.minPrice)}
-                  {item.maxPrice > item.minPrice ? ` ~ ${formatKoreanWon(item.maxPrice)}` : ''}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Multi-Platform Price Comparison */}
-      <section className="rounded-2xl bento-glass border border-slate-200 p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-[#1E2456]">플랫폼별 이벤트 가격 대조</h2>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedCode('ALL')}
-              className={`rounded-full px-3 py-1 text-xs font-semibold cursor-pointer ${
-                selectedCode === 'ALL' ? 'bg-[#1E2456] text-white' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              전체 시술
-            </button>
+        {/* Procedure Selector Tabs */}
+        {treatmentCodes.length > 0 && (
+          <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
             {treatmentCodes.map(([code, label]) => (
               <button
                 key={code}
                 type="button"
                 onClick={() => setSelectedCode(code)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold cursor-pointer ${
-                  selectedCode === code ? 'bg-[#1E2456] text-white' : 'bg-slate-100 text-slate-600'
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer border transition ${
+                  effectiveCode === code
+                    ? 'bg-[#EFF7F2] text-[#1B5E43] border-[#86B898] font-semibold'
+                    : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
+        )}
+      </section>
+
+      {/* Procedure-Specific HIRA Baseline + Platform Comparison Table */}
+      <section className="rounded-xl border border-slate-200 bg-white px-6 py-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900">
+            플랫폼별 비교 · {activeBaseline?.treatmentName ?? ''}
+            {activeUnitLabel ? ` (${activeUnitLabel})` : ''}
+          </h2>
+          {activeBaseline && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>병원 신고 정가</span>
+              <span className="font-semibold tabular-nums tracking-tight line-through text-slate-400">
+                {formatPriceKRW(activeBaseline.minPrice)}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-2.5">
+        <div className="divide-y divide-slate-100">
           {normalizedOffers.map((offer, idx) => (
             <div
               key={offer.id}
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${
-                idx === 0 ? 'bg-[#EFF7F2] border-[#86B898]' : 'bg-white border-slate-200'
-              }`}
+              className="py-3.5 flex flex-wrap items-center justify-between gap-3"
             >
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-[#1E2456] px-2 py-0.5 text-[11px] font-bold text-white">
-                    {offer.platformLabel}
-                  </span>
-                  {offer.badge && (
-                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-[#1E2456]">
-                      {offer.badge}
+                  <span className="text-xs font-bold text-[#1E2456]">{offer.platformLabel}</span>
+                  {idx === 0 && (
+                    <span className="rounded-md bg-[#EFF7F2] px-2 py-0.5 text-[11px] font-semibold text-[#1B5E43]">
+                      최저 실결제가
                     </span>
                   )}
-                  {idx === 0 && <BestPriceBadge label="현재 조건 최저가" />}
                 </div>
-                <p className="text-sm font-semibold text-slate-900">{offer.rawTitle}</p>
-                <p className="text-[11px] text-slate-500">
-                  표기가 {formatKoreanWon(offer.listedPrice)} (
-                  {offer.vatIncluded ? 'VAT 포함' : 'VAT 별도'})
+                <p className="text-sm font-medium text-slate-900">{offer.rawTitle}</p>
+                <p className="text-xs text-slate-500 tabular-nums">
+                  {offer.vatIncluded
+                    ? `부가세 포함 ${formatPriceKRW(offer.listedPrice)}`
+                    : includeVat
+                      ? `이벤트가 ${formatPriceKRW(offer.listedPrice)} + 부가세 10%`
+                      : `이벤트가 ${formatPriceKRW(offer.listedPrice)} (부가세 별도)`}
                   {offer.savingsAmount > 0 &&
-                    ` · 정가 대비 ${formatKoreanWon(offer.savingsAmount)} (${offer.savingsPercent}%) 절감`}
+                    ` · 신고 정가 대비 ${formatPriceKRW(offer.savingsAmount)} 할인`}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-extrabold text-slate-900">
-                  {formatKoreanWon(offer.effectivePrice)}
+              <div className="flex items-center gap-4 shrink-0">
+                {idx === 0 && offer.savingsPercent > 0 && (
+                  <span className="text-xs font-bold text-[#1B5E43] tabular-nums">
+                    -{offer.savingsPercent}%
+                  </span>
+                )}
+                <span
+                  className={`text-right text-base sm:text-lg font-bold tabular-nums tracking-tight ${
+                    idx === 0 ? 'text-[#1B5E43]' : 'text-slate-900'
+                  }`}
+                >
+                  {formatPriceKRW(offer.effectivePrice)}
                 </span>
                 <a
                   href={offer.bookingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-xl bg-[#1E2456] px-3 py-2 text-xs font-bold text-white hover:bg-[#252D6B]"
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 hover:underline whitespace-nowrap"
                 >
-                  <span>예약처 이동</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  원문 보기 ↗
                 </a>
               </div>
             </div>

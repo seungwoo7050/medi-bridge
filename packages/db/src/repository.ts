@@ -98,6 +98,7 @@ export class DrizzleComparisonRepository implements ComparisonRepository {
           sido: row.sido,
           sigungu: row.sigungu,
           roadAddress: row.roadAddress,
+          subwayInfo: null,
           lat: row.lat,
           lng: row.lng,
           rating: row.rating,

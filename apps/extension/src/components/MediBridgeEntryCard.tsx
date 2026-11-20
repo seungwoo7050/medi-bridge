@@ -1,10 +1,10 @@
 import {
   computeEffectivePrice,
   computeSavingsVsBaseline,
-  formatKoreanWon,
+  formatPriceKRW,
   type HospitalComparisonSummary,
 } from '@medi-bridge/shared';
-import { BestPriceBadge, BrandInfinityIcon, HiraVerifiedBadge } from '@medi-bridge/ui';
+import { BestPriceBadge, BrandInfinityIcon } from '@medi-bridge/ui';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
@@ -178,7 +178,7 @@ export function MediBridgeEntryCard({
           onClick={(e) => handleOpenTarget(e, searchUrl)}
         >
           <BrandInfinityIcon size={16} />
-          <span>메디 브릿지 · 심평원 및 5개 플랫폼 가격 대조 중...</span>
+          <span>메디 브릿지 · 플랫폼 가격 비교 불러오는 중...</span>
           <span aria-hidden="true">↗</span>
         </a>
       </div>
@@ -205,8 +205,7 @@ export function MediBridgeEntryCard({
               <span className="mb-logo-pill" aria-hidden="true">
                 <BrandInfinityIcon size={15} />
               </span>
-              <span className="mb-brand-title">MEDI BRIDGE</span>
-              {comparison.hiraVerified && <HiraVerifiedBadge compact />}
+              <span className="mb-brand-title">메디 브릿지</span>
               {comparison.rating !== null && (
                 <span className="mb-rating">
                   ★ {comparison.rating.toFixed(1)} ({comparison.reviewCount.toLocaleString('ko-KR')}
@@ -229,8 +228,8 @@ export function MediBridgeEntryCard({
           <div className="mb-controls-row">
             {baseline && (
               <div className="mb-hira-baseline">
-                <span className="mb-hira-label">심평원 {baseline.treatmentName} 정가</span>
-                <span className="mb-hira-price">{formatKoreanWon(baseline.minPrice)}</span>
+                <span className="mb-hira-label">병원 신고 정가 · {baseline.treatmentName}</span>
+                <span className="mb-hira-price">{formatPriceKRW(baseline.minPrice)}</span>
               </div>
             )}
             <button
@@ -241,7 +240,7 @@ export function MediBridgeEntryCard({
               className={`mb-vat-toggle ${includeVat ? 'is-on' : 'is-off'}`}
               onClick={handleToggleVat}
             >
-              {includeVat ? 'VAT 포함 기준' : '플랫폼 표기가 기준'}
+              {includeVat ? '부가세 포함 기준' : '앱 표기가 기준'}
             </button>
           </div>
 
@@ -259,14 +258,16 @@ export function MediBridgeEntryCard({
                   <span className="mb-platform-pill">{offer.platformLabel}</span>
                   {idx === 0 && <BestPriceBadge label="최저가" />}
                   {!offer.vatIncluded && (
-                    <span className="mb-vat-note">{includeVat ? 'VAT+10% 반영' : 'VAT별도'}</span>
+                    <span className="mb-vat-note">
+                      {includeVat ? '부가세+10% 반영' : '부가세 별도'}
+                    </span>
                   )}
                 </div>
                 <div className="mb-offer-right">
                   {offer.savingsPercent > 0 && (
                     <span className="mb-savings-pill">-{offer.savingsPercent}%</span>
                   )}
-                  <span className="mb-offer-price">{formatKoreanWon(offer.effectivePrice)}</span>
+                  <span className="mb-offer-price">{formatPriceKRW(offer.effectivePrice)}</span>
                   <span className="mb-arrow" aria-hidden="true">
                     ↗
                   </span>

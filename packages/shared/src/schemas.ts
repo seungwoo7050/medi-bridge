@@ -21,7 +21,7 @@ export const PlatformSourceSchema = z.enum([
 export type PlatformSource = z.infer<typeof PlatformSourceSchema>;
 
 export const PLATFORM_LABELS: Readonly<Record<PlatformSource, string>> = {
-  hira: '심평원 신고가',
+  hira: '병원 신고 정가',
   modoodoc: '모두닥',
   gangnamunni: '강남언니',
   yeoshin: '여신티켓',
@@ -36,6 +36,7 @@ export const StandardTreatmentSchema = z.object({
   code: z.string().min(1),
   category: TreatmentCategorySchema,
   label: z.string().min(1),
+  unitLabel: z.string().default('1회'),
   aliases: z.array(z.string().min(1)),
 });
 export type StandardTreatment = z.infer<typeof StandardTreatmentSchema>;
@@ -69,6 +70,7 @@ export type NormalizedPriceOffer = z.infer<typeof NormalizedPriceOfferSchema>;
 export const HiraBaselineItemSchema = z.object({
   treatmentCode: z.string().min(1),
   treatmentName: z.string().min(1),
+  unitLabel: z.string().optional(),
   minPrice: z.number().int().nonnegative(),
   maxPrice: z.number().int().nonnegative(),
   reportedDate: z.string().min(1),
@@ -84,11 +86,13 @@ export const HospitalComparisonSummarySchema = z.object({
   sido: z.string().min(1),
   sigungu: z.string().min(1),
   roadAddress: z.string().min(1),
+  subwayInfo: z.string().nullable().default(null),
   lat: z.number(),
   lng: z.number(),
   rating: z.number().nullable(),
   reviewCount: z.number().int().nonnegative(),
   hiraVerified: z.boolean(),
+  activeTreatmentCode: z.string().nullable().default(null),
   hiraBaselineItems: z.array(HiraBaselineItemSchema),
   offers: z.array(NormalizedPriceOfferSchema),
   lowestOffer: NormalizedPriceOfferSchema.nullable(),

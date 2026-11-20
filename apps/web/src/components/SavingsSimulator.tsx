@@ -1,6 +1,6 @@
 'use client';
 
-import { computeEffectivePrice, formatKoreanWon } from '@medi-bridge/shared';
+import { computeEffectivePrice, formatPriceKRW } from '@medi-bridge/shared';
 import { SlidersHorizontal } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
@@ -29,7 +29,7 @@ const SCENARIOS: readonly SimulatorScenario[] = [
   },
   {
     id: 'inmode',
-    label: '인모드 FX 풀페이스 (서초권 피부과)',
+    label: '인모드 FX (강남권 피부과)',
     hiraPrice: 450_000,
     offers: [
       { platform: '여신티켓', listedPrice: 160_000, vatIncluded: false },
@@ -68,14 +68,14 @@ export function SavingsSimulator(): React.JSX.Element {
   const savings = lowest ? Math.max(0, scenario.hiraPrice - lowest.effective) : 0;
 
   return (
-    <div className="rounded-2xl bento-glass border border-slate-200 p-6 space-y-5">
+    <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-extrabold text-[#1E2456]">
-            내 동네 시술가 거품 빼기 시뮬레이터
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">
+            부가세 별도 낚시 계산 시뮬레이터
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            VAT 별도 광고 가격과 VAT 포함 실제 결제 금액의 순위 변화를 직접 확인해 보세요.
+            부가세 10% 포함 여부에 따라 실제 최저가 순위가 어떻게 바뀌는지 직접 확인해 보세요.
           </p>
         </div>
 
@@ -84,14 +84,14 @@ export function SavingsSimulator(): React.JSX.Element {
           role="switch"
           aria-checked={includeVat}
           onClick={() => setIncludeVat((prev) => !prev)}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold border transition cursor-pointer ${
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold border transition cursor-pointer ${
             includeVat
               ? 'bg-[#1E2456] text-white border-[#1E2456]'
-              : 'bg-slate-100 text-slate-700 border-slate-300'
+              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
           }`}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          <span>{includeVat ? 'VAT 포함 실질가 기준' : '플랫폼 광고 표기가 기준'}</span>
+          <span>{includeVat ? '부가세 10% 포함 실결제가' : '앱 광고 표기가 (부가세 별도)'}</span>
         </button>
       </div>
 
@@ -101,10 +101,10 @@ export function SavingsSimulator(): React.JSX.Element {
             key={item.id}
             type="button"
             onClick={() => setScenarioId(item.id)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition cursor-pointer ${
               scenarioId === item.id
-                ? 'bg-[#2F6F55] text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-[#EFF7F2] text-[#1B5E43] border-[#86B898] font-semibold'
+                : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
             }`}
           >
             {item.label}
@@ -112,50 +112,56 @@ export function SavingsSimulator(): React.JSX.Element {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-xl bg-[#EEF0FA] border border-[#C7CEEB] p-4 space-y-1">
-          <span className="text-[11px] font-bold text-[#1E2456]">심평원 신고 정가</span>
-          <p className="text-xl font-extrabold text-slate-900">
-            {formatKoreanWon(scenario.hiraPrice)}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-y border-slate-100 py-4">
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-slate-500">병원 신고 정가</span>
+          <p className="text-xl font-bold tabular-nums tracking-tight text-slate-900">
+            {formatPriceKRW(scenario.hiraPrice)}
           </p>
-          <p className="text-[11px] text-slate-500">공공데이터 기준 비교선</p>
+          <p className="text-[11px] text-slate-400">건강보험심사평가원 공개 기준</p>
         </div>
 
-        <div className="rounded-xl bg-[#EFF7F2] border border-[#C5E1CF] p-4 space-y-1">
-          <span className="text-[11px] font-bold text-[#2F6F55]">현재 기준 최저 플랫폼</span>
-          <p className="text-xl font-extrabold text-[#2F6F55]">
-            {lowest ? `${lowest.platform} ${formatKoreanWon(lowest.effective)}` : '-'}
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-[#1B5E43]">현재 조건 최저가</span>
+          <p className="text-xl font-bold tabular-nums tracking-tight text-[#1B5E43]">
+            {lowest ? `${lowest.platform} ${formatPriceKRW(lowest.effective)}` : '-'}
           </p>
-          <p className="text-[11px] text-slate-600">
-            {includeVat ? '숨은 부가세 10% 자동 반영됨' : 'VAT 별도 표기가 기준 정렬'}
+          <p className="text-[11px] text-slate-500">
+            {includeVat ? '숨은 부가세 10% 자동 합산' : '부가세 별도 광고 표기 기준'}
           </p>
         </div>
 
-        <div className="rounded-xl bg-[#1E2456] text-white p-4 space-y-1">
-          <span className="text-[11px] font-bold text-[#86B898]">예상 절감 금액</span>
-          <p className="text-xl font-extrabold">{formatKoreanWon(savings)}</p>
-          <p className="text-[11px] text-indigo-200">동일 병원 심평원 신고 정가 대비</p>
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-slate-500">신고 정가 대비 절감</span>
+          <p className="text-xl font-bold tabular-nums tracking-tight text-[#1E2456]">
+            {formatPriceKRW(savings)}
+          </p>
+          <p className="text-[11px] text-slate-400">동일 병원·동일 시술 기준</p>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="divide-y divide-slate-100">
         {ranked.map((item, idx) => (
-          <div
-            key={item.platform}
-            className={`flex items-center justify-between rounded-xl border px-4 py-2.5 text-xs ${
-              idx === 0 ? 'bg-[#EFF7F2] border-[#86B898]' : 'bg-white border-slate-200'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[#1E2456]">
+          <div key={item.platform} className="py-2.5 flex items-center justify-between text-xs">
+            <div>
+              <span className="font-bold text-slate-900">
                 {idx + 1}위 · {item.platform}
               </span>
-              <span className="text-slate-500">
-                (표기 {formatKoreanWon(item.listedPrice)} ·{' '}
-                {item.vatIncluded ? 'VAT 포함' : 'VAT 별도'})
-              </span>
+              {!item.vatIncluded && (
+                <p className="text-[11px] text-slate-500 tabular-nums mt-0.5">
+                  {includeVat
+                    ? `이벤트가 ${formatPriceKRW(item.listedPrice)} + 부가세 10%`
+                    : '부가세 10% 별도 표기'}
+                </p>
+              )}
             </div>
-            <span className="font-extrabold text-slate-900">{formatKoreanWon(item.effective)}</span>
+            <span
+              className={`text-right text-sm font-bold tabular-nums tracking-tight ${
+                idx === 0 ? 'text-[#1B5E43]' : 'text-slate-900'
+              }`}
+            >
+              {formatPriceKRW(item.effective)}
+            </span>
           </div>
         ))}
       </div>

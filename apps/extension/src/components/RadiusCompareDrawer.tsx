@@ -1,14 +1,9 @@
 import {
   type BoundsSortBy,
-  formatKoreanWon,
+  formatPriceKRW,
   type HospitalComparisonSummary,
 } from '@medi-bridge/shared';
-import {
-  BestPriceBadge,
-  BrandInfinityIcon,
-  EmptySearchGraphic,
-  HiraVerifiedBadge,
-} from '@medi-bridge/ui';
+import { BestPriceBadge, BrandInfinityIcon, EmptySearchGraphic } from '@medi-bridge/ui';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
@@ -153,11 +148,11 @@ export function RadiusCompareDrawer({ hospitals }: RadiusCompareDrawerProps): Re
 
           <div className="mb-drawer-body">
             {loading ? (
-              <p className="mb-drawer-status">현재 화면 병원의 정규화 가격을 비교하는 중...</p>
+              <p className="mb-drawer-status">현재 화면 병원의 실결제가를 비교하는 중...</p>
             ) : items.length === 0 ? (
               <div className="mb-drawer-empty">
                 <EmptySearchGraphic />
-                <p>현재 목록에서 심평원·이벤트 매칭 병원이 아직 없습니다.</p>
+                <p>현재 목록에서 가격 정보가 있는 병원이 아직 없습니다.</p>
               </div>
             ) : (
               <ul className="mb-drawer-list">
@@ -167,7 +162,6 @@ export function RadiusCompareDrawer({ hospitals }: RadiusCompareDrawerProps): Re
                       <div className="mb-drawer-clinic-meta">
                         <span className="mb-drawer-rank">{index + 1}</span>
                         <span className="mb-drawer-name">{clinic.name}</span>
-                        {clinic.hiraVerified && <HiraVerifiedBadge compact />}
                       </div>
                       {index === 0 && <BestPriceBadge label="화면 최저" />}
                     </div>
@@ -183,7 +177,7 @@ export function RadiusCompareDrawer({ hospitals }: RadiusCompareDrawerProps): Re
                           rel="noopener noreferrer"
                           className="mb-drawer-price-link"
                         >
-                          {formatKoreanWon(clinic.lowestOffer.effectivePrice)} ↗
+                          {formatPriceKRW(clinic.lowestOffer.effectivePrice)} ↗
                         </a>
                       </div>
                     )}

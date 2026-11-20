@@ -50,6 +50,7 @@ export function buildHospitalComparisonSummary(
     readonly sido: string;
     readonly sigungu: string;
     readonly roadAddress: string;
+    readonly subwayInfo?: string | null;
     readonly lat: number;
     readonly lng: number;
     readonly rating: number | null;
@@ -76,12 +77,25 @@ export function buildHospitalComparisonSummary(
     baselineByTreatment,
   );
 
-  const lowestOffer =
-    offers.find((offer) => offer.platform !== 'hira' && offer.effectivePrice > 0) ?? null;
+  const nonHiraOffers = offers.filter(
+    (offer) => offer.platform !== 'hira' && offer.effectivePrice > 0,
+  );
+  // 동일 시술 코드 내에서만 최저가·절감율을 산출해 이종 시술 혼입을 차단
+  const activeTreatmentCode =
+    treatmentCodeFilter ??
+    record.hiraBaselineItems[0]?.treatmentCode ??
+    nonHiraOffers[0]?.treatmentCode ??
+    null;
+
+  const primaryOffers = activeTreatmentCode
+    ? nonHiraOffers.filter((offer) => offer.treatmentCode === activeTreatmentCode)
+    : nonHiraOffers;
+
+  const lowestOffer = primaryOffers[0] ?? null;
 
   let maxSavingsAmount = 0;
   let maxSavingsPercent = 0;
-  for (const offer of offers) {
+  for (const offer of primaryOffers) {
     if (offer.savingsAmount > maxSavingsAmount) {
       maxSavingsAmount = offer.savingsAmount;
     }
@@ -99,11 +113,13 @@ export function buildHospitalComparisonSummary(
     sido: record.sido,
     sigungu: record.sigungu,
     roadAddress: record.roadAddress,
+    subwayInfo: record.subwayInfo ?? null,
     lat: record.lat,
     lng: record.lng,
     rating: record.rating,
     reviewCount: record.reviewCount,
     hiraVerified: record.hiraVerified,
+    activeTreatmentCode,
     hiraBaselineItems: [...record.hiraBaselineItems],
     offers,
     lowestOffer,
@@ -256,6 +272,7 @@ export class SeedComparisonRepository implements ComparisonRepository {
           record.name,
           record.department,
           record.roadAddress,
+          record.subwayInfo ?? '',
           ...record.rawOffers.map((o) => `${o.treatmentName} ${o.rawTitle}`),
         ]
           .join(' ')

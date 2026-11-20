@@ -18,7 +18,7 @@ describe('SeedComparisonRepository', () => {
       includeVat: true,
     });
     expect(withVat).not.toBeNull();
-    expect(withVat?.lowestOffer?.effectivePrice).toBe(1_290_000);
+    expect(withVat?.lowestOffer?.effectivePrice).toBe(2_090_000);
     const smileWithVat = withVat?.offers.filter((o) => o.treatmentCode === 'OPHTH_SMILE') ?? [];
     expect(smileWithVat[0]?.platform).toBe('modoodoc');
     expect(smileWithVat[0]?.effectivePrice).toBe(2_090_000);
@@ -51,8 +51,8 @@ describe('SeedComparisonRepository', () => {
     });
 
     expect(results).toHaveLength(2);
-    expect(results[0]?.name).toBe('지에스안과의원');
-    expect(results[0]?.lowestOffer?.effectivePrice).toBe(1_190_000);
+    expect(results[0]?.name).toBe('강남케이안과의원');
+    expect(results[0]?.lowestOffer?.effectivePrice).toBe(2_090_000);
   });
 });
 

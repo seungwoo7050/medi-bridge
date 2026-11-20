@@ -60,5 +60,6 @@ export {
   computeEffectivePrice,
   computeSavingsVsBaseline,
   formatKoreanWon,
+  formatPriceKRW,
   rankOffersByEffectivePrice,
 } from './vatNormalizer';

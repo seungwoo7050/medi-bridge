@@ -8,11 +8,5 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     comparisonRepo.getTreatmentCatalogStats(true),
   ]);
 
-  const hasDynamicMapKey = Boolean(
-    process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID,
-  );
-
-  return (
-    <ClinicExplorer initialClinics={clinics} stats={stats} hasDynamicMapKey={hasDynamicMapKey} />
-  );
+  return <ClinicExplorer initialClinics={clinics} stats={stats} />;
 }
