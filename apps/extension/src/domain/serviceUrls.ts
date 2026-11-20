@@ -7,4 +7,3 @@ function resolveBaseUrl(): string {
 }
 
 export const WEB_APP_URL = resolveBaseUrl();
-export const API_BASE_URL = WEB_APP_URL;

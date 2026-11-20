@@ -1,12 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: [
-    '@medi-bridge/ui',
-    '@medi-bridge/shared',
-    '@medi-bridge/parsers',
-    '@medi-bridge/db',
-  ],
+  transpilePackages: ['@medi-bridge/ui', '@medi-bridge/shared'],
   images: {
     unoptimized: true,
   },

@@ -6,8 +6,6 @@ import {
   getBridgeState,
   RECENT_HOSPITALS_KEY,
   setBridgeEnabled,
-  setVatIncluded,
-  VAT_INCLUDED_KEY,
 } from '../../domain/bridgeStorage';
 import {
   clearRecentHospitalsViaWorker,
@@ -45,7 +43,6 @@ async function openExternalTab(url: string): Promise<void> {
 
 export function PopupApp(): React.JSX.Element {
   const [bridgeEnabled, setBridgeEnabledState] = useState<boolean>(true);
-  const [vatIncluded, setVatIncludedState] = useState<boolean>(true);
   const [recentHospitals, setRecentHospitals] = useState<readonly RecentHospitalRecord[]>([]);
   const [searchInput, setSearchInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -54,7 +51,6 @@ export function PopupApp(): React.JSX.Element {
   const loadState = useCallback(async () => {
     const state = await getBridgeState();
     setBridgeEnabledState(state.bridgeEnabled);
-    setVatIncludedState(state.vatIncluded);
     setRecentHospitals(state.recentHospitals);
     setLoading(false);
   }, []);
@@ -69,11 +65,7 @@ export function PopupApp(): React.JSX.Element {
       if (areaName !== 'local') {
         return;
       }
-      if (
-        BRIDGE_ENABLED_KEY in changes ||
-        VAT_INCLUDED_KEY in changes ||
-        RECENT_HOSPITALS_KEY in changes
-      ) {
+      if (BRIDGE_ENABLED_KEY in changes || RECENT_HOSPITALS_KEY in changes) {
         void loadState();
       }
     };
@@ -88,12 +80,6 @@ export function PopupApp(): React.JSX.Element {
     const nextValue = !bridgeEnabled;
     setBridgeEnabledState(nextValue);
     await setBridgeEnabled(nextValue);
-  };
-
-  const handleVatToggle = async () => {
-    const nextValue = !vatIncluded;
-    setVatIncludedState(nextValue);
-    await setVatIncluded(nextValue);
   };
 
   const handleQuickSearch = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -188,18 +174,11 @@ export function PopupApp(): React.JSX.Element {
         <div className="status-left">
           <span className={`status-dot ${bridgeEnabled ? 'is-active' : 'is-paused'}`} />
           <span className="status-text">
-            {bridgeEnabled ? '지도 위 5개 플랫폼 가격 비교 중' : '지도 오버레이 일시 중지됨'}
+            {bridgeEnabled
+              ? '네이버 지도 실시간 병원 가격·리뷰 연동 중'
+              : '지도 오버레이 일시 중지됨'}
           </span>
         </div>
-        <button
-          type="button"
-          className={`vat-pill ${vatIncluded ? 'is-on' : 'is-off'}`}
-          onClick={() => {
-            void handleVatToggle();
-          }}
-        >
-          {vatIncluded ? 'VAT 포함' : '표기가'}
-        </button>
       </section>
 
       <section className="popup-section">
@@ -310,7 +289,7 @@ export function PopupApp(): React.JSX.Element {
             void openExternalTab(WEB_APP_URL);
           }}
         >
-          자체 웹에서 전체 비교 ↗
+          확장프로그램 안내 ↗
         </button>
         <button
           type="button"

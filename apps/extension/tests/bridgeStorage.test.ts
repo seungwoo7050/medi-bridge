@@ -53,7 +53,6 @@ import {
   attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
-  getCachedHospitalComparison,
   getCachedHospitalSummary,
   MAX_RECENT_HOSPITALS,
   markHospitalClicked,
@@ -63,12 +62,9 @@ import {
   SUMMARY_HIT_TTL_MS,
   SUMMARY_MISS_TTL_MS,
   setBridgeEnabled,
-  setCachedHospitalComparison,
   setCachedHospitalSummary,
-  setVatIncluded,
   subscribeBridgeEnabled,
   subscribeRecentHospitals,
-  subscribeVatIncluded,
 } from '../src/domain/bridgeStorage';
 import type { ModoodocHospitalSummary } from '../src/types/place';
 
@@ -83,8 +79,9 @@ const SAMPLE_SUMMARY: ModoodocHospitalSummary = {
   topPrices: [
     {
       name: '스마일라식',
-      displayPrice: '209만원',
-      originalPrice: '350만원',
+      displayPrice: '2,090,000원',
+      originalPrice: '3,500,000원',
+      discountPercent: 40,
       badge: '이벤트',
       numericPrice: 2090000,
     },
@@ -101,29 +98,12 @@ describe('bridgeStorage', () => {
     vi.useRealTimers();
   });
 
-  it('초기 상태는 bridgeEnabled=true, vatIncluded=true, recentHospitals=[]를 반환한다', async () => {
+  it('초기 상태는 bridgeEnabled=true, recentHospitals=[]를 반환한다', async () => {
     const state = await getBridgeState();
     expect(state).toEqual({
       bridgeEnabled: true,
-      vatIncluded: true,
       recentHospitals: [],
     });
-  });
-
-  it('setVatIncluded와 subscribeVatIncluded가 실시간 VAT 토글 변경을 동기화한다', async () => {
-    const vatCallback = vi.fn();
-    const unsub = subscribeVatIncluded(vatCallback);
-    await setVatIncluded(false);
-    expect(vatCallback).toHaveBeenCalledWith(false);
-    const state = await getBridgeState();
-    expect(state.vatIncluded).toBe(false);
-    unsub();
-  });
-
-  it('병원 비교 캐시(getCachedHospitalComparison/setCachedHospitalComparison)를 저장하고 조회한다', async () => {
-    await setCachedHospitalComparison('강남케이안과의원', '서울 강남구', null);
-    const hit = await getCachedHospitalComparison('강남케이안과의원', '서울 강남구');
-    expect(hit).toEqual({ hit: true, comparison: null });
   });
 
   it('병원 열람과 모두닥 클릭 여부를 LRU 순서로 저장하고 clickedModoodoc 상태를 보존한다', async () => {
@@ -240,7 +220,7 @@ describe('bridgeStorage', () => {
       totalScore: 10,
       reviewCount: 10,
       representativeTreatment: '스마일라식',
-      representativePrice: '209만원',
+      representativePrice: '2,090,000원',
       platformLabel: '모두닥',
     });
 
@@ -250,7 +230,7 @@ describe('bridgeStorage', () => {
       department: '안과',
       regionHint: '서울 강남구',
     });
-    expect(afterRevisit[0]?.summary?.representativePrice).toBe('209만원');
+    expect(afterRevisit[0]?.summary?.representativePrice).toBe('2,090,000원');
   });
 
   it('요약 캐시 hit/miss TTL 만료를 정확히 판정한다', async () => {

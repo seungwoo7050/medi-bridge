@@ -1,4 +1,3 @@
-import type { HospitalComparisonSummary } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import type {
   HistoryMutation,
@@ -8,7 +7,6 @@ import type {
   RecentHospitalRecord,
 } from '../types/place';
 import {
-  attachComparisonToRecentHospital,
   attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
@@ -35,12 +33,6 @@ export async function applyHistoryMutation(
       return (await getBridgeState()).recentHospitals;
     case 'attach':
       return attachSummaryToRecentHospital(mutation.name, mutation.regionHint, mutation.summary);
-    case 'attach_comparison':
-      return attachComparisonToRecentHospital(
-        mutation.name,
-        mutation.regionHint,
-        mutation.comparison,
-      );
   }
 }
 
@@ -93,12 +85,4 @@ export function attachSummaryViaWorker(
   summary: ModoodocHospitalSummary,
 ): Promise<readonly RecentHospitalRecord[]> {
   return requestHistoryMutation({ op: 'attach', name, regionHint, summary });
-}
-
-export function attachComparisonViaWorker(
-  name: string,
-  regionHint: string,
-  comparison: HospitalComparisonSummary,
-): Promise<readonly RecentHospitalRecord[]> {
-  return requestHistoryMutation({ op: 'attach_comparison', name, regionHint, comparison });
 }

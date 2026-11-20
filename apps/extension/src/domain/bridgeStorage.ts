@@ -1,9 +1,7 @@
-import { formatPriceKRW, type HospitalComparisonSummary } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { toHospitalPreviewSummary } from '../adapters/modoodocSearchParser';
 import type {
   BridgeStorageState,
-  CachedComparisonEntry,
   CachedModoodocEntry,
   HospitalPreviewSummary,
   ModoodocHospitalSummary,
@@ -17,10 +15,8 @@ import {
 } from './modoodocUrl';
 
 export const BRIDGE_ENABLED_KEY = 'bridgeEnabled';
-export const VAT_INCLUDED_KEY = 'vatIncluded';
 export const RECENT_HOSPITALS_KEY = 'recentHospitals';
 export const SUMMARY_CACHE_KEY = 'modoodocSummaryCache';
-export const COMPARISON_CACHE_KEY = 'mediBridgeComparisonCache';
 
 export const MAX_RECENT_HOSPITALS = 20;
 export const MAX_SUMMARY_CACHE = 60;
@@ -46,20 +42,6 @@ export interface HospitalHistoryInput {
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-export function comparisonToPreviewSummary(
-  comparison: HospitalComparisonSummary,
-): HospitalPreviewSummary {
-  const lowest = comparison.lowestOffer;
-  return {
-    detailUrl: lowest?.bookingUrl ?? buildModoodocSearchUrl(comparison.name, comparison.sigungu),
-    totalScore: comparison.rating,
-    reviewCount: comparison.reviewCount,
-    representativeTreatment: lowest?.treatmentName ?? null,
-    representativePrice: lowest ? formatPriceKRW(lowest.effectivePrice) : null,
-    platformLabel: lowest?.platformLabel ?? '병원 신고 정가',
-  };
 }
 
 export function isHospitalPreviewSummary(value: unknown): value is HospitalPreviewSummary {
@@ -135,50 +117,21 @@ function parseSummaryCache(raw: unknown): CachedModoodocEntry[] {
   return raw.filter(isCachedModoodocEntry).slice(0, MAX_SUMMARY_CACHE);
 }
 
-function isCachedComparisonEntry(value: unknown): value is CachedComparisonEntry {
-  if (!isRecordObject(value)) {
-    return false;
-  }
-  return (
-    typeof value.key === 'string' &&
-    typeof value.fetchedAt === 'number' &&
-    (value.comparison === null || isRecordObject(value.comparison))
-  );
-}
-
-function parseComparisonCache(raw: unknown): CachedComparisonEntry[] {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  return raw.filter(isCachedComparisonEntry).slice(0, MAX_SUMMARY_CACHE);
-}
-
 export async function getBridgeState(): Promise<BridgeStorageState> {
-  const stored = await browser.storage.local.get([
-    BRIDGE_ENABLED_KEY,
-    VAT_INCLUDED_KEY,
-    RECENT_HOSPITALS_KEY,
-  ]);
+  const stored = await browser.storage.local.get([BRIDGE_ENABLED_KEY, RECENT_HOSPITALS_KEY]);
 
   const rawEnabled = stored[BRIDGE_ENABLED_KEY];
-  const rawVat = stored[VAT_INCLUDED_KEY];
   const bridgeEnabled = typeof rawEnabled === 'boolean' ? rawEnabled : true;
-  const vatIncluded = typeof rawVat === 'boolean' ? rawVat : true;
   const recentHospitals = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
 
   return {
     bridgeEnabled,
-    vatIncluded,
     recentHospitals,
   };
 }
 
 export async function setBridgeEnabled(enabled: boolean): Promise<void> {
   await browser.storage.local.set({ [BRIDGE_ENABLED_KEY]: enabled });
-}
-
-export async function setVatIncluded(vatIncluded: boolean): Promise<void> {
-  await browser.storage.local.set({ [VAT_INCLUDED_KEY]: vatIncluded });
 }
 
 async function upsertHospitalHistoryUnlocked(
@@ -195,27 +148,11 @@ async function upsertHospitalHistoryUnlocked(
   const id = buildHospitalKey(cleanName, cleanRegion);
   const searchUrl = buildModoodocSearchUrl(cleanName, cleanRegion);
 
-  const stored = await browser.storage.local.get([
-    RECENT_HOSPITALS_KEY,
-    SUMMARY_CACHE_KEY,
-    COMPARISON_CACHE_KEY,
-  ]);
+  const stored = await browser.storage.local.get([RECENT_HOSPITALS_KEY, SUMMARY_CACHE_KEY]);
   const existingList = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
   const existingRecord = existingList.find((item) => item.id === id);
 
   let resolvedSummary = existingRecord?.summary ?? null;
-  if (resolvedSummary === null) {
-    const compCache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
-    const compHit = compCache.find((item) => item.key === id);
-    if (
-      compHit &&
-      compHit.comparison !== null &&
-      Date.now() - compHit.fetchedAt < SUMMARY_HIT_TTL_MS
-    ) {
-      resolvedSummary = comparisonToPreviewSummary(compHit.comparison);
-    }
-  }
-
   if (resolvedSummary === null) {
     const cache = parseSummaryCache(stored[SUMMARY_CACHE_KEY]);
     const cachedEntry = cache.find((item) => item.key === id);
@@ -292,26 +229,6 @@ export function subscribeBridgeEnabled(onChange: (enabled: boolean) => void): ()
   };
 }
 
-export function subscribeVatIncluded(onChange: (vatIncluded: boolean) => void): () => void {
-  const listener = (
-    changes: Record<string, { newValue?: unknown; oldValue?: unknown }>,
-    areaName: string,
-  ) => {
-    if (areaName !== 'local') {
-      return;
-    }
-    const change = changes[VAT_INCLUDED_KEY];
-    if (change && typeof change.newValue === 'boolean') {
-      onChange(change.newValue);
-    }
-  };
-
-  browser.storage.onChanged.addListener(listener);
-  return () => {
-    browser.storage.onChanged.removeListener(listener);
-  };
-}
-
 export function subscribeRecentHospitals(
   onChange: (records: readonly RecentHospitalRecord[]) => void,
 ): () => void {
@@ -359,31 +276,6 @@ export async function getCachedHospitalSummary(
   return { hit: true, summary: entry.summary };
 }
 
-export async function getCachedHospitalComparison(
-  name: string,
-  regionHint: string,
-): Promise<{ hit: boolean; comparison: HospitalComparisonSummary | null }> {
-  const cleanName = normalizeHospitalName(name);
-  const cleanRegion = extractRegionHintFromAddress(regionHint);
-  const key = buildHospitalKey(cleanName, cleanRegion);
-
-  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
-  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
-  const entry = cache.find((item) => item.key === key);
-
-  if (!entry) {
-    return { hit: false, comparison: null };
-  }
-
-  const age = Date.now() - entry.fetchedAt;
-  const maxTtl = entry.comparison !== null ? SUMMARY_HIT_TTL_MS : SUMMARY_MISS_TTL_MS;
-  if (age >= maxTtl) {
-    return { hit: false, comparison: null };
-  }
-
-  return { hit: true, comparison: entry.comparison };
-}
-
 async function setCachedHospitalSummaryUnlocked(
   name: string,
   regionHint: string,
@@ -405,29 +297,6 @@ async function setCachedHospitalSummaryUnlocked(
     MAX_SUMMARY_CACHE,
   );
   await browser.storage.local.set({ [SUMMARY_CACHE_KEY]: nextCache });
-}
-
-async function setCachedHospitalComparisonUnlocked(
-  name: string,
-  regionHint: string,
-  comparison: HospitalComparisonSummary | null,
-): Promise<void> {
-  const cleanName = normalizeHospitalName(name);
-  const cleanRegion = extractRegionHintFromAddress(regionHint);
-  const key = buildHospitalKey(cleanName, cleanRegion);
-
-  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
-  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
-  const newEntry: CachedComparisonEntry = {
-    key,
-    fetchedAt: Date.now(),
-    comparison,
-  };
-  const nextCache = [newEntry, ...cache.filter((item) => item.key !== key)].slice(
-    0,
-    MAX_SUMMARY_CACHE,
-  );
-  await browser.storage.local.set({ [COMPARISON_CACHE_KEY]: nextCache });
 }
 
 async function attachPreviewToRecentHospitalUnlocked(
@@ -483,14 +352,6 @@ export function setCachedHospitalSummary(
   return enqueueWrite(() => setCachedHospitalSummaryUnlocked(name, regionHint, summary));
 }
 
-export function setCachedHospitalComparison(
-  name: string,
-  regionHint: string,
-  comparison: HospitalComparisonSummary | null,
-): Promise<void> {
-  return enqueueWrite(() => setCachedHospitalComparisonUnlocked(name, regionHint, comparison));
-}
-
 export function attachSummaryToRecentHospital(
   name: string,
   regionHint: string,
@@ -498,15 +359,5 @@ export function attachSummaryToRecentHospital(
 ): Promise<readonly RecentHospitalRecord[]> {
   return enqueueWrite(() =>
     attachPreviewToRecentHospitalUnlocked(name, regionHint, toHospitalPreviewSummary(summary)),
-  );
-}
-
-export function attachComparisonToRecentHospital(
-  name: string,
-  regionHint: string,
-  comparison: HospitalComparisonSummary,
-): Promise<readonly RecentHospitalRecord[]> {
-  return enqueueWrite(() =>
-    attachPreviewToRecentHospitalUnlocked(name, regionHint, comparisonToPreviewSummary(comparison)),
   );
 }

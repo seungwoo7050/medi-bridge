@@ -4,11 +4,6 @@ import type {
   ModoodocPriceItem,
   ModoodocTreatmentTag,
 } from '@medi-bridge/parsers';
-import type {
-  BoundsClinicInput,
-  BoundsSortBy,
-  HospitalComparisonSummary,
-} from '@medi-bridge/shared';
 
 export type {
   ModoodocHospitalSummary,
@@ -28,6 +23,8 @@ export interface ExtractedHospitalPlace {
   readonly regionHint: string;
   /** 배지 UI를 마운트할 기준 DOM 요소 */
   readonly anchorElement: HTMLElement;
+  /** /photo, /review 등 고정 탭바 하위 서브탭 여부 */
+  readonly isSubTab?: boolean;
 }
 
 export interface ExtractedSearchListHospital {
@@ -78,12 +75,6 @@ export interface CachedModoodocEntry {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
-export interface CachedComparisonEntry {
-  readonly key: string;
-  readonly fetchedAt: number;
-  readonly comparison: HospitalComparisonSummary | null;
-}
-
 export interface FetchModoodocSummaryRequest {
   readonly type: 'FETCH_MODOODOC_SUMMARY';
   readonly hospitalName: string;
@@ -96,31 +87,14 @@ export interface FetchModoodocSummaryResponse {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
-export interface FetchHospitalComparisonRequest {
-  readonly type: 'FETCH_HOSPITAL_COMPARISON';
-  readonly hospitalName: string;
+export interface SearchRegionHintItem {
+  readonly name: string;
   readonly regionHint: string;
-  readonly department: string;
-  readonly includeVat?: boolean;
 }
 
-export interface FetchHospitalComparisonResponse {
-  readonly ok: boolean;
-  readonly comparison: HospitalComparisonSummary | null;
-  readonly ssrSummary: ModoodocHospitalSummary | null;
-}
-
-export interface CompareBoundsClinicsRequest {
-  readonly type: 'COMPARE_BOUNDS_CLINICS';
-  readonly clinics: readonly BoundsClinicInput[];
-  readonly department?: string;
-  readonly includeVat: boolean;
-  readonly sortBy: BoundsSortBy;
-}
-
-export interface CompareBoundsClinicsResponse {
-  readonly ok: boolean;
-  readonly items: readonly HospitalComparisonSummary[];
+export interface RegisterSearchRegionHintsRequest {
+  readonly type: 'REGISTER_SEARCH_REGION_HINTS';
+  readonly items: readonly SearchRegionHintItem[];
 }
 
 export interface OpenModoodocHospitalRequest {
@@ -150,12 +124,6 @@ export type HistoryMutation =
       readonly name: string;
       readonly regionHint: string;
       readonly summary: ModoodocHospitalSummary;
-    }
-  | {
-      readonly op: 'attach_comparison';
-      readonly name: string;
-      readonly regionHint: string;
-      readonly comparison: HospitalComparisonSummary;
     };
 
 export interface MutateHistoryRequest {
@@ -170,6 +138,5 @@ export interface MutateHistoryResponse {
 
 export interface BridgeStorageState {
   readonly bridgeEnabled: boolean;
-  readonly vatIncluded: boolean;
   readonly recentHospitals: readonly RecentHospitalRecord[];
 }

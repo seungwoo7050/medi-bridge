@@ -51,6 +51,25 @@ describe('extractHospitalFromEntryDocument', () => {
     expect(extracted?.regionHint).toBe('서울 서초구');
   });
 
+  it('단독 .o3Ae6 .pz7wy 주소 및 og:description 메타 지역 폴백을 추출한다', () => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = `
+      <div class="WmLT9"><span class="PbnXW">드라마치과병원</span></div>
+      <div class="HzrWS"><span class="mwWcl">치과</span></div>
+      <div class="o3Ae6"><span class="pz7wy">경기 성남시 분당구 정자일로198번길 15</span></div>
+    `;
+    expect(extractHospitalFromEntryDocument(document)?.regionHint).toBe('경기 성남시');
+
+    document.body.innerHTML = `
+      <div class="WmLT9"><span class="PbnXW">드라마치과병원</span></div>
+      <div class="HzrWS"><span class="mwWcl">치과</span></div>
+    `;
+    document.head.innerHTML =
+      '<meta property="og:description" content="경기 성남시 분당구 정자동" />';
+    expect(extractHospitalFromEntryDocument(document)?.regionHint).toBe('경기 성남시');
+    document.head.innerHTML = '';
+  });
+
   it('검색 목록 컨테이너(#_pcmap_list_scroll_container) 문서에서는 null을 반환한다', () => {
     document.body.innerHTML = `
       <div id="_pcmap_list_scroll_container">
@@ -82,5 +101,52 @@ describe('extractHospitalFromEntryDocument', () => {
       </div>
     `;
     expect(extractHospitalFromEntryDocument(document)).toBeNull();
+  });
+
+  it('/hospital/*/photo 서브탭에서 진료과·주소 배지가 없어도 헤더·탭바 기준으로 추출하고 /place/*는 차단한다', () => {
+    const prevPath = `${window.location.pathname}${window.location.search}`;
+    try {
+      window.history.replaceState({}, '', '/hospital/20139861/photo?entry=bmp');
+      document.head.innerHTML = '';
+      document.body.innerHTML = `
+        <header class="place_tab_shadow FFTct" role="banner">
+          <h1 id="_header" class="bh9OH">드라마치과병원</h1>
+        </header>
+        <div class="place_fixed_maintab place_stuck">
+          <div role="tablist">홈리뷰사진정보</div>
+        </div>
+      `;
+
+      const photoExtracted = extractHospitalFromEntryDocument(document);
+      expect(photoExtracted).not.toBeNull();
+      expect(photoExtracted?.name).toBe('드라마치과병원');
+      expect(photoExtracted?.matchedDepartment).toBe('치과');
+      expect(photoExtracted?.regionHint).toBe('');
+      expect(photoExtracted?.isSubTab).toBe(true);
+      expect(photoExtracted?.anchorElement.className).toContain('place_fixed_maintab');
+
+      window.history.replaceState({}, '', '/place/99999/photo');
+      expect(extractHospitalFromEntryDocument(document)).toBeNull();
+
+      window.history.replaceState({}, '', '/hospital/20139861/photo?entry=bmp');
+      document.body.innerHTML = `
+        <div role="main">
+          <div>
+            <div class="WmLT9"><span class="PbnXW">드라마치과병원</span></div>
+            <div class="HzrWS"><span class="mwWcl">치과</span></div>
+          </div>
+          <div class="place_fixed_maintab">
+            <div role="tablist">홈리뷰사진정보</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="photo-grid"><img alt="병원" /></div>
+        </div>
+      `;
+      const stuckExtracted = extractHospitalFromEntryDocument(document);
+      expect(stuckExtracted?.isSubTab).toBe(true);
+      expect(stuckExtracted?.anchorElement.className).toBe('spacer');
+    } finally {
+      window.history.replaceState({}, '', prevPath || '/');
+    }
   });
 });

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildExternalPlatformLinks,
   classifyTreatmentName,
   computeEffectivePrice,
   detectVatIncluded,
   evaluateMedicalCategory,
+  formatPriceKRW,
   rankOffersByEffectivePrice,
   scoreClinicResolution,
+  scoreNameMatch,
 } from '../src/index';
 
 describe('VAT normalization and ranking', () => {
@@ -115,5 +118,16 @@ describe('clinic resolution & medical category filtering', () => {
     expect(evaluateMedicalCategory('피부과,레이저', '연세봄피부과의원').matchedDepartment).toBe(
       '피부과',
     );
+
+    expect(scoreNameMatch('연세꿈꾸는치과의원 분당점', '연세꿈꾸는치과의원')).toBe(80);
+    expect(scoreNameMatch('강남하늘안과의원', '하늘안과의원')).toBe(0);
+    expect(formatPriceKRW(2_090_000)).toBe('2,090,000원');
+
+    const dermLinks = buildExternalPlatformLinks('여름의원', '서울 서초구', '피부과');
+    expect(dermLinks.map((l) => l.label)).toEqual(['강남언니', '여신티켓', '바비톡', '굿닥']);
+    const dentalLinks = buildExternalPlatformLinks('드라마치과병원', '경기 성남시', '치과');
+    expect(dentalLinks.map((l) => l.label)).toEqual(['강남언니', '굿닥']);
+    const orthoLinks = buildExternalPlatformLinks('서울정형외과', '서울 강남구', '정형외과');
+    expect(orthoLinks.map((l) => l.label)).toEqual(['굿닥']);
   });
 });

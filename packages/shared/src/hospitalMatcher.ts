@@ -153,12 +153,16 @@ export function scoreNameMatch(candidateName: string, targetName: string): numbe
     return 90;
   }
 
-  const shorter = normCand.length <= normTarget.length ? normCand : normTarget;
-  const longer = normCand.length <= normTarget.length ? normTarget : normCand;
-
-  if (shorter.length >= 4 && longer.includes(shorter)) {
-    const nonMedicalShorter = stripCommonMedicalWords(shorter);
-    if (nonMedicalShorter.length >= 2 && longer.includes(nonMedicalShorter)) {
+  // 전위 일치(예: '연세꿈꾸는치과' vs '연세꿈꾸는치과의원 분당점')만 허용해
+  // '강남하늘안과의원' ↔ '하늘안과의원' 같은 접두지역 오매칭을 차단
+  const shorterStripped =
+    candStripped.length <= targetStripped.length ? candStripped : targetStripped;
+  if (
+    shorterStripped.length >= 4 &&
+    (candStripped.startsWith(targetStripped) || targetStripped.startsWith(candStripped))
+  ) {
+    const nonMedicalShorter = stripCommonMedicalWords(shorterStripped);
+    if (nonMedicalShorter.length >= 2) {
       return 80;
     }
   }
@@ -183,6 +187,55 @@ export function extractRegionHintFromAddress(rawAddress: string): string {
   }
 
   return tokens.slice(0, 2).join(' ');
+}
+
+export interface ExternalPlatformLink {
+  readonly platform: 'gangnamunni' | 'yeoshin' | 'babitalk' | 'goodoc';
+  readonly label: string;
+  readonly url: string;
+}
+
+/**
+ * 진료과 특성에 맞춰 동일 병원명·지역 기반 외부 비급여 플랫폼 검색 링크 목록을 생성합니다.
+ */
+export function buildExternalPlatformLinks(
+  hospitalName: string,
+  regionHint = '',
+  department = '',
+): readonly ExternalPlatformLink[] {
+  const cleanName = normalizeHospitalName(hospitalName);
+  const cleanRegion = extractRegionHintFromAddress(regionHint);
+  const regionQuery = cleanRegion ? `${cleanRegion} ${cleanName}` : cleanName;
+  const normalizedDept = normalizeDepartmentCategory(department);
+
+  const gangnamunni: ExternalPlatformLink = {
+    platform: 'gangnamunni',
+    label: '강남언니',
+    url: `https://www.gangnamunni.com/events?q=${encodeURIComponent(cleanName)}`,
+  };
+  const yeoshin: ExternalPlatformLink = {
+    platform: 'yeoshin',
+    label: '여신티켓',
+    url: `https://www.yeoshin.co.kr/search/main?q=${encodeURIComponent(cleanName)}`,
+  };
+  const babitalk: ExternalPlatformLink = {
+    platform: 'babitalk',
+    label: '바비톡',
+    url: `https://web.babitalk.com/search?keyword=${encodeURIComponent(cleanName)}`,
+  };
+  const goodoc: ExternalPlatformLink = {
+    platform: 'goodoc',
+    label: '굿닥',
+    url: `https://www.goodoc.co.kr/search?keyword=${encodeURIComponent(regionQuery)}`,
+  };
+
+  if (normalizedDept === '피부과' || normalizedDept === '성형외과') {
+    return [gangnamunni, yeoshin, babitalk, goodoc];
+  }
+  if (normalizedDept === '안과' || normalizedDept === '치과') {
+    return [gangnamunni, goodoc];
+  }
+  return [goodoc];
 }
 
 export function buildModoodocSearchUrl(hospitalName: string, regionHint = ''): string {

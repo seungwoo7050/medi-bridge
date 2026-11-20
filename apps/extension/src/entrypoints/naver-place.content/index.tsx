@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client';
+import { browser } from 'wxt/browser';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import {
   createShadowRootUi,
@@ -9,7 +10,6 @@ import { extractHospitalFromEntryDocument } from '../../adapters/naverEntryDom';
 import { extractHospitalsFromSearchList } from '../../adapters/naverSearchListDom';
 import { MediBridgeEntryCard } from '../../components/MediBridgeEntryCard';
 import { MediBridgeListChip } from '../../components/MediBridgeListChip';
-import { RadiusCompareDrawer } from '../../components/RadiusCompareDrawer';
 import {
   getBridgeState,
   subscribeBridgeEnabled,
@@ -20,12 +20,15 @@ import {
   recordHospitalViewViaWorker,
 } from '../../domain/historyGateway';
 import { buildHospitalKey } from '../../domain/modoodocUrl';
-import type { ExtractedSearchListHospital, RecentHospitalRecord } from '../../types/place';
+import type {
+  ExtractedSearchListHospital,
+  RecentHospitalRecord,
+  RegisterSearchRegionHintsRequest,
+} from '../../types/place';
 import './style.css';
 
 const ENTRY_SHADOW_HOST_NAME = 'medi-bridge-entry-card';
 const LIST_SHADOW_HOST_NAME = 'medi-bridge-list-chip';
-const DRAWER_SHADOW_HOST_NAME = 'medi-bridge-radius-drawer';
 const DEBOUNCE_MS = 120;
 
 interface MountedListChip {
@@ -45,8 +48,6 @@ export default defineContentScript({
     let currentEntrySignature: string | null = null;
     let lastRecordedSignature: string | null = null;
     let activeEntryUi: ShadowRootContentScriptUi<ReactDOM.Root> | null = null;
-    let activeDrawerUi: ShadowRootContentScriptUi<ReactDOM.Root> | null = null;
-    let activeDrawerRoot: ReactDOM.Root | null = null;
     let isSyncing = false;
     let pendingResync = false;
     let debounceTimer: number | null = null;
@@ -101,14 +102,6 @@ export default defineContentScript({
       currentEntrySignature = null;
     };
 
-    const cleanupDrawerUi = () => {
-      if (activeDrawerUi) {
-        activeDrawerUi.remove();
-        activeDrawerUi = null;
-      }
-      activeDrawerRoot = null;
-    };
-
     const cleanupDisconnectedListChips = () => {
       for (const [itemEl, mounted] of mountedListChips.entries()) {
         if (!itemEl.isConnected) {
@@ -123,7 +116,6 @@ export default defineContentScript({
         mounted.ui.remove();
       }
       mountedListChips.clear();
-      cleanupDrawerUi();
     };
 
     const syncEntryBadge = async () => {
@@ -133,9 +125,13 @@ export default defineContentScript({
         return;
       }
 
-      const nextSignature = `${place.name}::${place.regionHint}`;
+      const nextSignature = `${place.name}::${place.regionHint}::${place.isSubTab ? 'subtab' : 'home'}`;
       const existingHost = document.querySelector(ENTRY_SHADOW_HOST_NAME);
-      if (currentEntrySignature === nextSignature && existingHost) {
+      if (
+        currentEntrySignature === nextSignature &&
+        existingHost &&
+        existingHost.previousElementSibling === place.anchorElement
+      ) {
         return;
       }
 
@@ -155,6 +151,7 @@ export default defineContentScript({
               hospitalName={place.name}
               regionHint={place.regionHint}
               department={place.matchedDepartment}
+              isSubTab={place.isSubTab ?? false}
               onSelect={() => {
                 void markHospitalClickedViaWorker({
                   name: place.name,
@@ -190,48 +187,6 @@ export default defineContentScript({
       }
     };
 
-    const syncRadiusDrawer = async (listHospitals: readonly ExtractedSearchListHospital[]) => {
-      if (listHospitals.length === 0 || !document.body) {
-        cleanupDrawerUi();
-        return;
-      }
-
-      const existingHost = document.querySelector(DRAWER_SHADOW_HOST_NAME);
-      if (activeDrawerUi && activeDrawerRoot && existingHost) {
-        activeDrawerRoot.render(<RadiusCompareDrawer hospitals={listHospitals} />);
-        return;
-      }
-
-      cleanupDrawerUi();
-
-      let drawerRoot: ReactDOM.Root | null = null;
-      const ui = await createShadowRootUi(ctx, {
-        name: DRAWER_SHADOW_HOST_NAME,
-        position: 'overlay',
-        anchor: document.body,
-        onMount: (container) => {
-          const mountNode = document.createElement('div');
-          container.append(mountNode);
-          const root = ReactDOM.createRoot(mountNode);
-          drawerRoot = root;
-          root.render(<RadiusCompareDrawer hospitals={listHospitals} />);
-          return root;
-        },
-        onRemove: (root) => {
-          root?.unmount();
-        },
-      });
-
-      if (ctx.isInvalid || !bridgeEnabled) {
-        ui.remove();
-        return;
-      }
-
-      ui.mount();
-      activeDrawerUi = ui;
-      activeDrawerRoot = drawerRoot;
-    };
-
     const syncSearchListChips = async () => {
       cleanupDisconnectedListChips();
 
@@ -239,6 +194,18 @@ export default defineContentScript({
       if (listHospitals.length === 0) {
         cleanupAllListChips();
         return;
+      }
+
+      // 썸네일(/photo) 진입·지연 DOM으로 상세 프레임 주소가 비어 있을 때 활용하도록 지역 힌트만 SW 메모리에 중계(외부 요청 0건)
+      const regionItems = listHospitals
+        .filter((h) => h.regionHint.length > 0)
+        .map((h) => ({ name: h.name, regionHint: h.regionHint }));
+      if (regionItems.length > 0) {
+        const msg: RegisterSearchRegionHintsRequest = {
+          type: 'REGISTER_SEARCH_REGION_HINTS',
+          items: regionItems,
+        };
+        void browser.runtime.sendMessage(msg).catch(() => undefined);
       }
 
       const activeSet = new Set(listHospitals.map((item) => item.itemElement));
@@ -304,8 +271,6 @@ export default defineContentScript({
           });
         }
       }
-
-      await syncRadiusDrawer(listHospitals);
     };
 
     const runSync = async () => {

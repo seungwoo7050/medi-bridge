@@ -1,6 +1,6 @@
 {
   "name": "medi-bridge",
-  "description": "네이버 지도 위 통합 비급여·이벤트 의료 가격 비교 Chrome 확장프로그램 및 자체 반응형 비교 웹 플랫폼",
+  "description": "네이버 지도 위 전국 병원 실시간 비급여·리뷰 브릿지 Chrome 확장프로그램 및 안내 웹",
   "version": "1.0.0",
   "private": true,
   "type": "module",

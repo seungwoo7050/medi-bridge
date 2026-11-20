@@ -1,21 +1,12 @@
-import { SeedComparisonRepository } from '@medi-bridge/db/seed';
-import {
-  BoundsComparisonRequestSchema,
-  BoundsComparisonResponseSchema,
-  type HospitalComparisonSummary,
-  MatchHospitalResponseSchema,
-} from '@medi-bridge/shared';
+import { normalizeCompareName } from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { parseModoodocSearchResult } from '../adapters/modoodocSearchParser';
 import {
-  attachComparisonToRecentHospital,
   attachSummaryToRecentHospital,
   getBridgeState,
-  getCachedHospitalComparison,
   getCachedHospitalSummary,
   markHospitalClicked,
-  setCachedHospitalComparison,
   setCachedHospitalSummary,
   subscribeBridgeEnabled,
 } from '../domain/bridgeStorage';
@@ -26,23 +17,17 @@ import {
   extractRegionHintFromAddress,
   normalizeHospitalName,
 } from '../domain/modoodocUrl';
-import { API_BASE_URL } from '../domain/serviceUrls';
 import type {
-  CompareBoundsClinicsRequest,
-  CompareBoundsClinicsResponse,
-  FetchHospitalComparisonRequest,
-  FetchHospitalComparisonResponse,
   FetchModoodocSummaryRequest,
   FetchModoodocSummaryResponse,
   HistoryMutation,
-  ModoodocHospitalSummary,
   MutateHistoryRequest,
   OpenModoodocHospitalRequest,
   OpenModoodocHospitalResponse,
+  RegisterSearchRegionHintsRequest,
 } from '../types/place';
 
-const seedRepo = new SeedComparisonRepository();
-
+const MAX_SEARCH_REGION_HINTS = 300;
 const ACTIVE_ICON_PATHS = {
   16: 'icon/active-16.png',
   32: 'icon/active-32.png',
@@ -81,27 +66,14 @@ function isFetchModoodocSummaryRequest(value: unknown): value is FetchModoodocSu
   );
 }
 
-function isFetchHospitalComparisonRequest(value: unknown): value is FetchHospitalComparisonRequest {
+function isRegisterSearchRegionHintsRequest(
+  value: unknown,
+): value is RegisterSearchRegionHintsRequest {
   return (
     isRecordObject(value) &&
-    value.type === 'FETCH_HOSPITAL_COMPARISON' &&
-    typeof value.hospitalName === 'string' &&
-    typeof value.regionHint === 'string' &&
-    typeof value.department === 'string'
+    value.type === 'REGISTER_SEARCH_REGION_HINTS' &&
+    Array.isArray(value.items)
   );
-}
-
-function isCompareBoundsClinicsRequest(value: unknown): value is CompareBoundsClinicsRequest {
-  if (!isRecordObject(value) || value.type !== 'COMPARE_BOUNDS_CLINICS') {
-    return false;
-  }
-  const parsed = BoundsComparisonRequestSchema.safeParse({
-    clinics: value.clinics,
-    department: value.department,
-    includeVat: value.includeVat,
-    sortBy: value.sortBy,
-  });
-  return parsed.success;
 }
 
 function isOpenModoodocHospitalRequest(value: unknown): value is OpenModoodocHospitalRequest {
@@ -136,12 +108,6 @@ function isHistoryMutation(value: unknown): value is HistoryMutation {
         typeof value.regionHint === 'string' &&
         isRecordObject(value.summary)
       );
-    case 'attach_comparison':
-      return (
-        typeof value.name === 'string' &&
-        typeof value.regionHint === 'string' &&
-        isRecordObject(value.comparison)
-      );
     default:
       return false;
   }
@@ -154,20 +120,52 @@ function isMutateHistoryRequest(value: unknown): value is MutateHistoryRequest {
 }
 
 const inFlightSsr = new Map<string, Promise<FetchModoodocSummaryResponse>>();
-const inFlightComparison = new Map<string, Promise<FetchHospitalComparisonResponse>>();
+const searchRegionHints = new Map<string, string>();
+
+function registerSearchRegionHints(items: readonly unknown[]): void {
+  for (const raw of items) {
+    if (!isRecordObject(raw)) continue;
+    if (typeof raw.name !== 'string' || typeof raw.regionHint !== 'string') continue;
+    const cleanName = normalizeCompareName(normalizeHospitalName(raw.name));
+    const cleanRegion = extractRegionHintFromAddress(raw.regionHint);
+    if (!cleanName || !cleanRegion) continue;
+    searchRegionHints.delete(cleanName);
+    searchRegionHints.set(cleanName, cleanRegion);
+    while (searchRegionHints.size > MAX_SEARCH_REGION_HINTS) {
+      const oldest = searchRegionHints.keys().next().value;
+      if (oldest === undefined) break;
+      searchRegionHints.delete(oldest);
+    }
+  }
+}
+
+function resolveEffectiveRegion(hospitalName: string, regionHint: string): string {
+  const direct = extractRegionHintFromAddress(regionHint);
+  if (direct) {
+    return direct;
+  }
+  const key = normalizeCompareName(normalizeHospitalName(hospitalName));
+  return searchRegionHints.get(key) ?? '';
+}
 
 async function fetchModoodocSsrSummary(
   hospitalName: string,
   regionHint: string,
-): Promise<{ readonly ok: boolean; readonly summary: ModoodocHospitalSummary | null }> {
+): Promise<FetchModoodocSummaryResponse> {
   const cleanName = normalizeHospitalName(hospitalName);
-  const cleanRegion = extractRegionHintFromAddress(regionHint);
-  const key = buildHospitalKey(cleanName, cleanRegion);
+  const directRegion = extractRegionHintFromAddress(regionHint);
+  const effectiveRegion = resolveEffectiveRegion(hospitalName, regionHint);
+  const hasEffectiveRegion = effectiveRegion.length > 0;
+  const key = buildHospitalKey(cleanName, effectiveRegion);
 
-  const cached = await getCachedHospitalSummary(hospitalName, regionHint);
-  if (cached.hit) {
+  const cached = await getCachedHospitalSummary(hospitalName, effectiveRegion);
+  // 지역 힌트가 비어 있을 때 과거 부정 캐시로 조기 종료하지 않음
+  if (cached.hit && (cached.summary !== null || hasEffectiveRegion)) {
     if (cached.summary !== null) {
-      await attachSummaryToRecentHospital(hospitalName, regionHint, cached.summary);
+      await attachSummaryToRecentHospital(hospitalName, effectiveRegion, cached.summary);
+      if (directRegion !== effectiveRegion) {
+        await attachSummaryToRecentHospital(hospitalName, directRegion, cached.summary);
+      }
     }
     return { ok: true, summary: cached.summary };
   }
@@ -179,7 +177,7 @@ async function fetchModoodocSsrSummary(
 
   const task = (async (): Promise<FetchModoodocSummaryResponse> => {
     try {
-      const searchUrl = buildModoodocSearchUrl(hospitalName, regionHint);
+      const searchUrl = buildModoodocSearchUrl(hospitalName, effectiveRegion);
       const res = await fetch(searchUrl, {
         signal: AbortSignal.timeout(5000),
         headers: { Accept: 'text/html' },
@@ -190,19 +188,27 @@ async function fetchModoodocSsrSummary(
       }
 
       const html = await res.text();
-      const parsed = parseModoodocSearchResult(html, hospitalName, regionHint);
+      const parsed = parseModoodocSearchResult(html, hospitalName, effectiveRegion);
       if (parsed.kind === 'parse_error') {
         // 구조 오류는 미등록으로 캐시하지 않아 부정 캐시 오염을 차단한다.
         return { ok: false, summary: null };
       }
 
-      const summary = parsed.kind === 'found' ? parsed.summary : null;
-      await setCachedHospitalSummary(hospitalName, regionHint, summary);
-      if (summary !== null) {
-        await attachSummaryToRecentHospital(hospitalName, regionHint, summary);
+      if (parsed.kind === 'not_found') {
+        // 지역 누락 상태의 not_found는 부정 캐시에 넣지 않아 주소 릴레이 후 즉시 재시도한다.
+        if (hasEffectiveRegion) {
+          await setCachedHospitalSummary(hospitalName, effectiveRegion, null);
+        }
+        return { ok: true, summary: null };
       }
 
-      return { ok: true, summary };
+      await setCachedHospitalSummary(hospitalName, effectiveRegion, parsed.summary);
+      await attachSummaryToRecentHospital(hospitalName, effectiveRegion, parsed.summary);
+      if (directRegion !== effectiveRegion) {
+        await attachSummaryToRecentHospital(hospitalName, directRegion, parsed.summary);
+      }
+
+      return { ok: true, summary: parsed.summary };
     } catch {
       return { ok: false, summary: null };
     } finally {
@@ -214,151 +220,16 @@ async function fetchModoodocSsrSummary(
   return task;
 }
 
-async function fetchBackendMatch(
-  hospitalName: string,
-  regionHint: string,
-  department: string,
-  includeVat: boolean,
-): Promise<HospitalComparisonSummary | null> {
-  try {
-    const url = new URL('/api/v1/hospitals/match', API_BASE_URL);
-    url.searchParams.set('name', hospitalName);
-    url.searchParams.set('regionHint', regionHint);
-    url.searchParams.set('department', department);
-    url.searchParams.set('includeVat', String(includeVat));
-
-    const res = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(1200),
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) {
-      return null;
-    }
-
-    const json: unknown = await res.json();
-    const parsed = MatchHospitalResponseSchema.safeParse(json);
-    return parsed.success ? parsed.data.hospital : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchHospitalComparison(
-  req: FetchHospitalComparisonRequest,
-): Promise<FetchHospitalComparisonResponse> {
-  const cleanName = normalizeHospitalName(req.hospitalName);
-  const cleanRegion = extractRegionHintFromAddress(req.regionHint);
-  const key = buildHospitalKey(cleanName, cleanRegion);
-  const includeVat = req.includeVat ?? true;
-
-  const cachedComp = await getCachedHospitalComparison(req.hospitalName, req.regionHint);
-  if (cachedComp.hit && cachedComp.comparison !== null) {
-    await attachComparisonToRecentHospital(req.hospitalName, req.regionHint, cachedComp.comparison);
-    return { ok: true, comparison: cachedComp.comparison, ssrSummary: null };
-  }
-
-  const running = inFlightComparison.get(key);
-  if (running) {
-    return running;
-  }
-
-  const task = (async (): Promise<FetchHospitalComparisonResponse> => {
-    try {
-      let comparison = await fetchBackendMatch(
-        req.hospitalName,
-        req.regionHint,
-        req.department,
-        includeVat,
-      );
-
-      if (comparison === null) {
-        comparison = await seedRepo.matchHospital({
-          name: req.hospitalName,
-          regionHint: req.regionHint,
-          department: req.department,
-          includeVat,
-        });
-      }
-
-      if (comparison !== null) {
-        await setCachedHospitalComparison(req.hospitalName, req.regionHint, comparison);
-        await attachComparisonToRecentHospital(req.hospitalName, req.regionHint, comparison);
-        return { ok: true, comparison, ssrSummary: null };
-      }
-
-      // 정규화 DB·시드 미등록 병원은 기존 모두닥 SSR 요약 폴백 조회
-      const ssr = await fetchModoodocSsrSummary(req.hospitalName, req.regionHint);
-      return {
-        ok: ssr.ok,
-        comparison: null,
-        ssrSummary: ssr.summary,
-      };
-    } catch {
-      return { ok: false, comparison: null, ssrSummary: null };
-    } finally {
-      inFlightComparison.delete(key);
-    }
-  })();
-
-  inFlightComparison.set(key, task);
-  return task;
-}
-
-async function compareBoundsClinics(
-  req: CompareBoundsClinicsRequest,
-): Promise<CompareBoundsClinicsResponse> {
-  const payload = {
-    clinics: req.clinics,
-    ...(req.department ? { department: req.department } : {}),
-    includeVat: req.includeVat,
-    sortBy: req.sortBy,
-  };
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/hospitals/bounds`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(1500),
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok) {
-      const json: unknown = await res.json();
-      const parsed = BoundsComparisonResponseSchema.safeParse(json);
-      if (parsed.success) {
-        return { ok: true, items: parsed.data.items };
-      }
-    }
-  } catch {
-    // 백엔드 미실행 시 내장 시드 저장소로 무중단 폴백
-  }
-
-  const fallbackItems = await seedRepo.compareBounds({
-    clinics: [...req.clinics],
-    ...(req.department ? { department: req.department } : {}),
-    includeVat: req.includeVat,
-    sortBy: req.sortBy,
-  });
-
-  return { ok: true, items: fallbackItems };
-}
-
 async function openHospitalTarget(
   req: OpenModoodocHospitalRequest,
 ): Promise<OpenModoodocHospitalResponse> {
+  const effectiveRegion = resolveEffectiveRegion(req.hospitalName, req.regionHint);
   let targetUrl = req.targetUrl ?? null;
 
   if (!targetUrl) {
-    const comp = await fetchHospitalComparison({
-      type: 'FETCH_HOSPITAL_COMPARISON',
-      hospitalName: req.hospitalName,
-      regionHint: req.regionHint,
-      department: req.department,
-    });
+    const resolved = await fetchModoodocSsrSummary(req.hospitalName, effectiveRegion);
     targetUrl =
-      comp.comparison?.lowestOffer?.bookingUrl ??
-      comp.ssrSummary?.detailUrl ??
-      buildModoodocSearchUrl(req.hospitalName, req.regionHint);
+      resolved.summary?.detailUrl ?? buildModoodocSearchUrl(req.hospitalName, effectiveRegion);
   }
 
   // 실제 새 탭 생성 성공 후에만 클릭 이력을 기록한다.
@@ -366,24 +237,26 @@ async function openHospitalTarget(
   await markHospitalClicked({
     name: req.hospitalName,
     department: req.department,
-    regionHint: req.regionHint,
+    regionHint: effectiveRegion,
   });
 
   return { ok: true, targetUrl };
 }
 
 export default defineBackground(() => {
+  void browser.storage.local
+    .remove(['mediBridgeComparisonCache', 'vatIncluded'])
+    .catch(() => undefined);
   void getBridgeState().then((state) => syncToolbarActionIcon(state.bridgeEnabled));
   subscribeBridgeEnabled((enabled) => {
     void syncToolbarActionIcon(enabled);
   });
 
   browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
-    if (isFetchHospitalComparisonRequest(message)) {
-      fetchHospitalComparison(message)
-        .then((response) => sendResponse(response))
-        .catch(() => sendResponse({ ok: false, comparison: null, ssrSummary: null }));
-      return true;
+    if (isRegisterSearchRegionHintsRequest(message)) {
+      registerSearchRegionHints(message.items);
+      sendResponse({ ok: true });
+      return false;
     }
 
     if (isFetchModoodocSummaryRequest(message)) {
@@ -393,15 +266,19 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (isCompareBoundsClinicsRequest(message)) {
-      compareBoundsClinics(message)
-        .then((response) => sendResponse(response))
-        .catch(() => sendResponse({ ok: false, items: [] }));
-      return true;
-    }
-
     if (isMutateHistoryRequest(message)) {
-      applyHistoryMutation(message.mutation)
+      const mutation =
+        (message.mutation.op === 'view' || message.mutation.op === 'click') &&
+        !message.mutation.regionHint
+          ? {
+              ...message.mutation,
+              regionHint: resolveEffectiveRegion(
+                message.mutation.name,
+                message.mutation.regionHint,
+              ),
+            }
+          : message.mutation;
+      applyHistoryMutation(mutation)
         .then((recentHospitals) => sendResponse({ ok: true, recentHospitals }))
         .catch(() => sendResponse({ ok: false, recentHospitals: [] }));
       return true;
@@ -411,8 +288,9 @@ export default defineBackground(() => {
       openHospitalTarget(message)
         .then((response) => sendResponse(response))
         .catch(async () => {
+          const effectiveRegion = resolveEffectiveRegion(message.hospitalName, message.regionHint);
           const fallbackUrl =
-            message.targetUrl ?? buildModoodocSearchUrl(message.hospitalName, message.regionHint);
+            message.targetUrl ?? buildModoodocSearchUrl(message.hospitalName, effectiveRegion);
           try {
             await browser.tabs.create({ url: fallbackUrl });
           } catch {

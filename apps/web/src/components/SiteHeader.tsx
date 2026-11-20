@@ -22,20 +22,20 @@ export function SiteHeader(): React.JSX.Element {
           className="flex items-center gap-1 sm:gap-3 text-xs sm:text-sm whitespace-nowrap"
         >
           <Link
-            href="/"
+            href="/#how-it-works"
             className="rounded-lg px-2 sm:px-2.5 py-1.5 font-medium text-indigo-100 hover:bg-[#252D6B] hover:text-white transition"
           >
-            가격 비교
+            주요 기능
           </Link>
           <Link
-            href="/intro"
+            href="/#simulator"
             className="rounded-lg px-2 sm:px-2.5 py-1.5 font-medium text-indigo-100 hover:bg-[#252D6B] hover:text-white transition"
           >
-            <span className="sm:hidden">확장프로그램</span>
-            <span className="hidden sm:inline">크롬 확장프로그램</span>
+            <span className="sm:hidden">부가세</span>
+            <span className="hidden sm:inline">부가세 계산기</span>
           </Link>
           <Link
-            href="/intro#install"
+            href="/#install"
             className="rounded-lg bg-[#86B898] px-2.5 sm:px-3.5 py-1.5 text-xs font-bold text-[#142038] hover:bg-[#9AC7AA] transition shrink-0 whitespace-nowrap"
           >
             Chrome에 추가

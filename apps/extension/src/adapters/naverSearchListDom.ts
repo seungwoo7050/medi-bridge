@@ -45,12 +45,14 @@ function resolveAdFallbackCategory(
     return '';
   }
 
-  const badgeTexts = Array.from(itemEl.querySelectorAll<HTMLElement>('.wt0BA .D1dXu'))
+  const badgeTexts = Array.from(
+    itemEl.querySelectorAll<HTMLElement>('.wt0BA .D1dXu, .KJzzB .D1dXu'),
+  )
     .map((el) => el.textContent?.trim() ?? '')
     .filter(Boolean)
     .join(' ');
 
-  return badgeTexts || hospitalName;
+  return [badgeTexts, hospitalName].filter(Boolean).join(' ');
 }
 
 /**

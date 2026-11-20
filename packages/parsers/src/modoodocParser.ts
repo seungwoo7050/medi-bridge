@@ -1,4 +1,4 @@
-import { evaluateRegionCompatibility, formatKoreanWon, scoreNameMatch } from '@medi-bridge/shared';
+import { evaluateRegionCompatibility, formatPriceKRW, scoreNameMatch } from '@medi-bridge/shared';
 
 export interface ModoodocTreatmentTag {
   readonly name: string;
@@ -11,6 +11,7 @@ export interface ModoodocPriceItem {
   readonly name: string;
   readonly displayPrice: string;
   readonly originalPrice: string | null;
+  readonly discountPercent: number | null;
   readonly badge: ModoodocPriceBadge;
   readonly numericPrice: number;
 }
@@ -147,20 +148,29 @@ function parsePriceItem(raw: Record<string, unknown>): ModoodocPriceItem | null 
   const highestPrice = typeof rawHigh === 'number' ? rawHigh : lowestPrice;
   const hasRange = highestPrice > lowestPrice;
 
+  const formattedPrice = lowestPrice > 0 ? formatPriceKRW(lowestPrice) : '0원';
+  const displayPrice = hasRange && lowestPrice > 0 ? `${formattedPrice}~` : formattedPrice;
+
   let originalPrice: string | null = null;
+  let discountPercent: number | null = null;
   if (
     badge !== null &&
     isRecordObject(raw.normalPrice) &&
     typeof raw.normalPrice.lowestPrice === 'number' &&
     raw.normalPrice.lowestPrice > lowestPrice
   ) {
-    originalPrice = formatKoreanWon(raw.normalPrice.lowestPrice, false);
+    const normalLow = raw.normalPrice.lowestPrice;
+    originalPrice = formatPriceKRW(normalLow);
+    if (lowestPrice > 0) {
+      discountPercent = Math.round(((normalLow - lowestPrice) / normalLow) * 100);
+    }
   }
 
   return {
     name,
-    displayPrice: formatKoreanWon(lowestPrice, hasRange),
+    displayPrice,
     originalPrice,
+    discountPercent,
     badge,
     numericPrice: lowestPrice,
   };
@@ -288,6 +298,8 @@ export function parseModoodocSearchResult(
     readonly score: number;
   }> = [];
 
+  const hasRegionHint = targetRegionHint.trim().length > 0;
+
   for (const candidate of candidateMap.values()) {
     const slugBase = candidate.slug ? (candidate.slug.split('-')[0] ?? '') : '';
     const nameScore = scoreNameMatch(candidate.name, targetName);
@@ -295,6 +307,11 @@ export function parseModoodocSearchResult(
     const bestNameScore = Math.max(nameScore, slugScore);
 
     if (bestNameScore === 0) {
+      continue;
+    }
+
+    // 지역 힌트가 비어 있을 때는 분점 전위 일치(80점)로 타 도시 지점을 오매칭하지 않도록 >= 90점만 허용
+    if (!hasRegionHint && bestNameScore < 90) {
       continue;
     }
 

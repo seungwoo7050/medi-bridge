@@ -7,6 +7,6 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/", "/intro", "/intro/*", "/privacy", "/privacy/*", "/hospitals/*"]
+    "run_worker_first": ["/", "/intro", "/intro/*", "/privacy", "/privacy/*"]
   }
 }

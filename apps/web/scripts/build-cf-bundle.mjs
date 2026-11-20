@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const webRoot = resolve(import.meta.dirname, '..');
@@ -36,16 +36,6 @@ copyHtml(join(nextAppDir, 'index.html'), join(distDir, 'index.html'));
 copyHtml(join(nextAppDir, 'intro.html'), join(distDir, 'intro', 'index.html'));
 copyHtml(join(nextAppDir, 'privacy.html'), join(distDir, 'privacy', 'index.html'));
 copyHtml(join(nextAppDir, '_not-found.html'), join(distDir, '404.html'));
-
-const hospitalsDir = join(nextAppDir, 'hospitals');
-if (existsSync(hospitalsDir)) {
-  for (const entry of readdirSync(hospitalsDir)) {
-    if (entry.endsWith('.html')) {
-      const slug = entry.slice(0, -'.html'.length);
-      copyHtml(join(hospitalsDir, entry), join(distDir, 'hospitals', slug, 'index.html'));
-    }
-  }
-}
 
 for (const binaryAsset of ['icon.png', 'apple-icon.png']) {
   const srcBody = join(nextAppDir, `${binaryAsset}.body`);

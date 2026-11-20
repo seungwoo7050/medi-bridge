@@ -67,4 +67,33 @@ describe('extractHospitalsFromSearchList', () => {
     expect(results[1]?.matchedDepartment).toBe('안과');
     expect(results[1]?.regionHint).toBe('서울 강남구');
   });
+
+  it('진료과 배지가 없고 휴게시간 배지만 있는 병원 광고 행도 상호명에서 진료과를 추출한다', () => {
+    document.body.innerHTML = `
+      <div id="_pcmap_list_scroll_container">
+        <ul>
+          <li class="DWs4Q z23xh">
+            <div class="IPtqD">
+              <div class="uMPdj">
+                <a href="#" class="uD1F4 gADnZ" data-nlog-params='{"item_type":"place_type","item_name":"hospital"}'>
+                  <span class="q2LdB">드라마치과병원</span>
+                </a>
+              </div>
+              <div class="uFxr1"><span class="suKMR">경기 성남시 분당구 정자동</span></div>
+              <a href="#" class="KJzzB gADnZ">
+                <span class="D1dXu odr6z">휴게시간</span>
+                <span class="D1dXu">14:00에 진료 시작</span>
+              </a>
+            </div>
+          </li>
+        </ul>
+      </div>
+    `;
+
+    const results = extractHospitalsFromSearchList(document);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.name).toBe('드라마치과병원');
+    expect(results[0]?.matchedDepartment).toBe('치과');
+    expect(results[0]?.regionHint).toBe('경기 성남시');
+  });
 });
