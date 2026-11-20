@@ -33,7 +33,7 @@ function copyHtml(srcFile, destFile) {
 }
 
 copyHtml(join(nextAppDir, 'index.html'), join(distDir, 'index.html'));
-copyHtml(join(nextAppDir, 'intro.html'), join(distDir, 'intro', 'index.html'));
+copyHtml(join(nextAppDir, 'vat.html'), join(distDir, 'vat', 'index.html'));
 copyHtml(join(nextAppDir, 'privacy.html'), join(distDir, 'privacy', 'index.html'));
 copyHtml(join(nextAppDir, '_not-found.html'), join(distDir, '404.html'));
 

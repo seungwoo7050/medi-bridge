@@ -72,7 +72,7 @@ export function SavingsSimulator(): React.JSX.Element {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-slate-900">
-            부가세 별도 낚시 계산 시뮬레이터
+            부가세 10% 포함 실결제가 시뮬레이터
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             부가세 10% 포함 여부에 따라 실제 최저가 순위가 어떻게 바뀌는지 직접 확인해 보세요.

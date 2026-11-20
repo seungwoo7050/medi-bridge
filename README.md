@@ -18,7 +18,7 @@
 | **상세 패널 카드** | 네이버 지도 병원 상세(`/home`)나 사진(`/photo`) 탭을 열면 같은 지역의 모두닥 별점, 인증 리뷰 수, 시술별 가격과 할인율을 상단에 표시합니다 |
 | **검색 목록 미니 버튼** | 검색 결과 목록(스폰서 광고 행 포함) 옆에 작은 바로가기 칩을 붙여 원하는 병원을 바로 확인하거나 외부 검색으로 이동합니다 |
 | **툴바 팝업** | 확장 기능 사용 여부를 켜고 끄며 최근 확인한 병원 최대 20건의 열람 기록과 가격 요약을 다시 열어 봅니다 |
-| **안내 웹 및 부가세 계산기** | 스마일라식, 인모드 FX, 국산 임플란트 사례에서 부가세 10% 포함 여부에 따른 순위 역전과 최소 권한 정책(`/privacy`)을 확인합니다 |
+| **안내 웹 및 부가세 계산기** | 네이버 지도 작동 화면과 지원 진료과 안내(`/`), 참고용 부가세 10% 실결제가 계산기(`/vat`), 최소 권한 정책(`/privacy`)을 확인합니다 |
 
 - 검색 목록을 여는 단계에서는 외부 사이트로 자동 조회 요청을 보내지 않고(0건), 사용자가 병원을 열어 볼 때만 해당 병원을 단건 조회합니다.
 - 로그인이나 계정, 별도 백엔드 서버 없이 브라우저 내부에서만 동작합니다.
@@ -32,7 +32,7 @@ flowchart LR
     List["#searchIframe\n병원 목록 (외부 요청 0건)"] -->|"REGISTER_SEARCH_REGION_HINTS\n(최대 300건 FIFO)"| SW["Background Service Worker\ninFlight 병합 · 24h/30m 캐시"]
     Entry["#entryIframe\n병원 상세 · /photo 서브탭"] -->|"FETCH_MODOODOC_SUMMARY"| SW
     SW -->|"캐시 미스 시 단건 조회"| SSR["www.modoodoc.com\n공개 검색 __NEXT_DATA__"]
-    Web["apps/web 정적 번들\nCloudflare Workers (.cf-dist)"] -->|"RSC: 1 -> 404 폴백"| Landing["/ · /intro · /privacy\nVAT 10% 시뮬레이터"]
+    Web["apps/web 정적 번들\nCloudflare Workers (.cf-dist)"] -->|"RSC: 1 -> 404 · /intro -> / 301"| Landing["/ · /vat · /privacy\n안내 웹 · VAT 계산기"]
 ```
 
 ### 1. 크로스 프레임 행정구역 중계와 실시간 SSR 파싱
@@ -54,7 +54,7 @@ Content script, 팝업, Service Worker가 동시에 `browser.storage.local`을 �
 ## 프로젝트 구성
 
 - **Chrome MV3 확장 (`apps/extension`)**: WXT, React 19, TypeScript, Tailwind CSS v4, Shadow DOM 오버레이 및 툴바 팝업
-- **정적 안내 웹 (`apps/web`)**: Next.js 16, React 19, Tailwind CSS v4, 부가세 시뮬레이터(`/`, `/intro`) 및 개인정보처리방침(`/privacy`), Cloudflare Workers 정적 번들러
+- **정적 안내 웹 (`apps/web`)**: Next.js 16, React 19, Tailwind CSS v4, 공식 랜딩(`/`), 참고용 부가세 계산기(`/vat`), 개인정보처리방침(`/privacy`), Cloudflare Workers 정적 번들러
 - **공용 패키지 (`packages/*`)**: 도메인 매칭·VAT 계산(`shared`), 모두닥 SSR 파서(`parsers`), 공용 배지 토큰(`ui`)
 - **검증 및 CI (`.github/workflows/ci.yml`)**: TypeScript, Biome, Vitest, Chrome MV3 & 정적 웹 Playwright E2E
 
@@ -93,11 +93,11 @@ Chrome에서 로컬 확장 프로그램을 불러와 직접 확인하는 순서�
 | `pnpm test:e2e` | 빌드된 Chrome MV3 확장(지역 중계 `/photo` 포함)과 정적 웹 Playwright E2E 실행 |
 | `pnpm --filter @medi-bridge/web run deploy:cf` | `.cf-dist` 정적 번들을 조립해 Cloudflare Workers에 배포 |
 
-CI 파이프라인([`.github/workflows/ci.yml`](.github/workflows/ci.yml))은 모든 Pull Request와 `main` 푸시에서 `pnpm verify`, 확장·정적 웹 빌드, `manifest.json` 최소 권한 검사, Playwright E2E를 순서대로 실행합니다.
+CI 파이프라인([`.github/workflows/ci.yml`](.github/workflows/ci.yml))은 모든 Pull Request와 `main` 푸시에서 `pnpm verify`, 확장·정적 웹 빌드, `manifest.json` 최소 권한 검사, Playwright E2E를 순서대로 실행하며, `main` 푸시(또는 수동 실행) 시 저장소 시크릿 `CLOUDFLARE_API_TOKEN`이 등록되어 있으면 `.cf-dist`를 Cloudflare Workers로 자동 배포합니다.
 
 ## 현재 상태와 검증 범위
 
-정적 안내 웹(`/`, `/intro`, `/privacy`)은 Cloudflare Workers에 배포되어 있고, Chrome MV3 확장 빌드는 로컬 개발자 모드 테스트와 오프라인 E2E, 실제 네이버 플레이스 사진 서브탭 실통신 검증까지 마쳤습니다.
+정적 안내 웹(`/`, `/vat`, `/privacy`, `/intro`→`/` 301 리다이렉트)은 Cloudflare Workers에 배포되어 있고, Chrome MV3 확장 빌드는 로컬 개발자 모드 테스트와 오프라인 E2E, 실제 네이버 플레이스 사진 서브탭 실통신 검증까지 마쳤습니다.
 
 - **직진입 및 외부 링크 범위**: 검색 목록 프레임을 거치지 않고 `/hospital/<id>/photo` 주소로 바로 들어가면 중계된 지역 힌트가 없어 90점 이상 완전·정규화 상호만 매칭하며, 모두닥 외 4개 플랫폼(강남언니, 여신티켓, 바비톡, 굿닥)은 진료과 맞춤형 검색 결과 페이지로 연결합니다.
 - **남은 출시 작업**: Chrome Web Store 심사 등록 후 발급되는 설치 URL을 안내 웹 상단 버튼과 설치 섹션에 반영할 예정입니다.

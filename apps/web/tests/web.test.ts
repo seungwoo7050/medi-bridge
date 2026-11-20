@@ -6,7 +6,7 @@ describe('apps/web static Worker & VAT calculator', () => {
   it('RSC: 1 프리페치 헤더 요청은 404로 응답해 정적 404 루프를 방지한다', async () => {
     const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }));
     const res = await worker.fetch(
-      new Request('https://medi-bridge.seungwoo7050.workers.dev/intro?_rsc=1', {
+      new Request('https://medibridge.example.com/vat?_rsc=1', {
         headers: { RSC: '1' },
       }),
       { ASSETS: { fetch: fetchMock } },
@@ -16,14 +16,28 @@ describe('apps/web static Worker & VAT calculator', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('일반 정적 문서 요청(/, /intro, /privacy)은 ASSETS 바인딩에 그대로 위임한다', async () => {
-    const fetchMock = vi.fn(async () => new Response('<html>landing</html>', { status: 200 }));
-    const req = new Request('https://medi-bridge.seungwoo7050.workers.dev/privacy');
-    const res = await worker.fetch(req, { ASSETS: { fetch: fetchMock } });
+  it('/intro 경로 요청은 루트(/)로 301 영구 리다이렉트한다', async () => {
+    const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }));
+    const res = await worker.fetch(new Request('https://medibridge.example.com/intro'), {
+      ASSETS: { fetch: fetchMock },
+    });
 
-    expect(res.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(await res.text()).toContain('landing');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('Location')).toBe('https://medibridge.example.com/');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('일반 정적 문서 요청(/, /vat, /privacy)은 ASSETS 바인딩에 그대로 위임한다', async () => {
+    const fetchMock = vi.fn(async () => new Response('<html>landing</html>', { status: 200 }));
+
+    for (const path of ['/', '/vat', '/privacy']) {
+      const req = new Request(`https://medibridge.example.com${path}`);
+      const res = await worker.fetch(req, { ASSETS: { fetch: fetchMock } });
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('landing');
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('시뮬레이터의 부가세 10% 가산 계산이 원화 천 단위 포맷과 정확히 일치한다', () => {

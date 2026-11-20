@@ -1,12 +1,20 @@
+import { BrandInfinityIcon } from '@medi-bridge/ui';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type React from 'react';
+import { MobileCopyLinkBar } from '@/components/MobileCopyLinkBar';
 import { SiteHeader } from '@/components/SiteHeader';
+import { SITE_URL } from '@/lib/siteConfig';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '메디 브릿지 | 네이버 지도 병원 가격·리뷰 확장프로그램',
+  metadataBase: new URL(SITE_URL),
+  alternates: {
+    canonical: '/',
+  },
+  title: '메디브릿지 | 네이버 지도 병원 비급여 가격·리뷰 확장프로그램',
   description:
-    '네이버 지도에서 병원을 고르는 즉시 같은 지역의 모두닥 인증 리뷰와 비급여 가격표, 타 플랫폼 검색 링크를 한 화면에서 확인하는 Chrome 확장프로그램입니다.',
+    '병원 이름을 복사해 여러 앱을 뒤질 필요 없이, 네이버 지도에서 병원을 클릭하면 모두닥 인증 리뷰와 비급여 가격표를 바로 띄워 주는 Chrome 확장프로그램입니다.',
 };
 
 export default function RootLayout({
@@ -20,27 +28,38 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-slate-200 bg-white mt-14">
-          <div className="mx-auto max-w-5xl px-4 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-500">
-            <div className="space-y-1">
-              <p className="font-semibold text-slate-800">메디 브릿지</p>
-              <p className="break-keep">
-                네이버 지도 위에서 전국 병원의 모두닥 비급여 가격·인증 리뷰와 주요 미용·치과 플랫폼
-                검색을 연결하는 Chrome 확장프로그램입니다.
-              </p>
+          <div className="mx-auto max-w-5xl px-4 pt-8 pb-24 md:pb-10 space-y-5 text-xs text-slate-500">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <BrandInfinityIcon size={20} className="text-[#1E2456] shrink-0" />
+                  <p className="font-bold text-slate-900">메디브릿지</p>
+                </div>
+                <p className="break-keep">
+                  네이버 지도에서 병원 비급여 가격과 모두닥 인증 리뷰를 바로 확인하는 Chrome
+                  확장프로그램입니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-5 shrink-0 whitespace-nowrap">
+                <Link href="/" className="hover:text-[#1E2456] font-medium">
+                  확장프로그램 소개
+                </Link>
+                <Link href="/vat" className="hover:text-[#1E2456] font-medium">
+                  참고용 부가세 계산기
+                </Link>
+                <Link href="/privacy" className="hover:text-[#1E2456] font-medium">
+                  개인정보처리방침
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-5 shrink-0 whitespace-nowrap">
-              <a href="/" className="hover:text-[#1E2456] font-medium">
-                확장프로그램 안내
-              </a>
-              <a href="/#simulator" className="hover:text-[#1E2456] font-medium">
-                부가세 계산기
-              </a>
-              <a href="/privacy" className="hover:text-[#1E2456] font-medium">
-                개인정보처리방침
-              </a>
+
+            <div className="border-t border-slate-100 pt-4 text-[11px] leading-relaxed text-slate-400 break-keep">
+              본 서비스는 네이버, 모두닥, 강남언니, 여신티켓, 바비톡, 굿닥 등 언급된 플랫폼과 공식
+              제휴·운영 관계가 없는 독립 서드파티 브라우저 확장프로그램입니다.
             </div>
           </div>
         </footer>
+        <MobileCopyLinkBar />
       </body>
     </html>
   );

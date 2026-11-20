@@ -12,6 +12,11 @@ const worker = {
       return new Response('Not Found', { status: 404 });
     }
 
+    const url = new URL(request.url);
+    if (url.pathname === '/intro' || url.pathname === '/intro/') {
+      return Response.redirect(new URL('/', url.origin).toString(), 301);
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
