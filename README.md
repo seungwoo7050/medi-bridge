@@ -1,72 +1,78 @@
 <p align="center">
   <h1 align="center">medi-bridge</h1>
-  <p align="center">네이버 지도 병원 비급여 가격 및 인증 리뷰 브릿지 확장 프로그램</p>
+  <p align="center">네이버 지도에서 병원별 다중 플랫폼 비급여 가격을 모아 최저가순으로 정렬해 주는 Chrome 확장 프로그램</p>
   <p align="center"><a href="https://medi-bridge.seungwoo7050.workers.dev">medi-bridge.seungwoo7050.workers.dev</a></p>
   <p align="center">Chrome Extension (MV3) | WXT | React 19 | Next.js 16 | TypeScript | Zod | Cloudflare Workers | Playwright</p>
 </p>
 
-![메디 브릿지 안내 웹과 네이버 지도 오버레이 화면](assets/preview.png)
+![네이버 지도 검색 목록에서 열린 메디 브릿지 다중 플랫폼 가격 비교 창](assets/preview.png)
 
-네이버 지도에서 치과, 안과, 피부과, 성형외과, 정형외과를 찾을 때 같은 지역의 모두닥 인증 리뷰와 공개 비급여 가격표를 상세 패널 위에 바로 띄우고, 진료과에 맞는 다른 플랫폼(강남언니, 여신티켓, 바비톡, 굿닥) 검색으로 이어 주는 브라우저 확장 프로그램입니다. 별도 크롤링 서버 없이 동작하며, 안내 웹에서 부가세 10% 포함 시 실질 결제 순위가 어떻게 달라지는지 미리 계산해 볼 수 있습니다.
+네이버 지도에서 치과, 안과, 피부과, 성형외과, 정형외과를 찾을 때 병원 이름을 복사해서 여러 앱을 번갈아 검색할 필요 없이, 지도 화면 안에서 모두닥, 강남언니, 여신티켓, 바비톡의 이벤트 가격과 병원 신고 정가를 한 번에 모아서 부가세 10% 포함 실결제 금액 순으로 비교합니다. 검색 목록의 `가격 비교` 버튼을 눌러도 특정 사이트로 바로 이동하지 않고 지도 안에 비교 창을 먼저 열어 주며, 원하는 시술 가격을 눌렀을 때만 해당 플랫폼으로 연결합니다.
 
 > 비공식 브라우저 확장 도구입니다. 네이버, 모두닥, 강남언니, 여신티켓, 바비톡, 굿닥이 운영하거나 제휴한 서비스가 아닙니다.
 
 ## 주요 기능
 
-| 영역 | 돕는 일 |
+| 화면 | 돕는 일 |
 | --- | --- |
-| **상세 패널 카드** | 네이버 지도 병원 상세(`/home`)나 사진(`/photo`) 탭을 열면 같은 지역의 모두닥 별점, 인증 리뷰 수, 시술별 가격과 할인율을 상단에 표시합니다 |
-| **검색 목록 미니 버튼** | 검색 결과 목록(스폰서 광고 행 포함) 옆에 작은 바로가기 칩을 붙여 원하는 병원을 바로 확인하거나 외부 검색으로 이동합니다 |
-| **툴바 팝업** | 확장 기능 사용 여부를 켜고 끄며 최근 확인한 병원 최대 20건의 열람 기록과 가격 요약을 다시 열어 봅니다 |
-| **안내 웹 및 부가세 계산기** | 네이버 지도 작동 화면과 지원 진료과 안내(`/`), 참고용 부가세 10% 실결제가 계산기(`/vat`), 최소 권한 정책(`/privacy`)을 확인합니다 |
+| **검색 목록 비교 패널** | 지도 왼쪽 검색 목록(광고 행 포함) 옆 `가격 비교` 버튼을 누르면 외부 탭으로 나가지 않고 지도 안에서 플랫폼별 최저가순 가격, 시술 탭 필터, 부가세 포함 토글을 보여줍니다 |
+| **병원 상세·사진 탭 카드** | 병원 상세(`/home`)나 사진(`/photo`) 탭을 열면 수집된 전체 플랫폼 가격표를 최저가 오름차순으로 상단에 띄웁니다 |
+| **툴바 팝업** | 확장 프로그램 사용 여부를 켜고 끄며 최근 확인한 병원 최대 20건의 최저가 플랫폼 요약과 네이버 지도 빠른 검색을 엽니다 |
+| **안내 웹 및 부가세 계산기** | 실제 작동 화면과 지원 진료과 안내(`/`), 참고용 부가세 10% 계산기(`/vat`), 개인정보처리방침(`/privacy`)을 확인하고 체험 패키지 ZIP을 내려받습니다 |
 
-- 검색 목록을 여는 단계에서는 외부 사이트로 자동 조회 요청을 보내지 않고(0건), 사용자가 병원을 열어 볼 때만 해당 병원을 단건 조회합니다.
-- 로그인이나 계정, 별도 백엔드 서버 없이 브라우저 내부에서만 동작합니다.
-- `storage` 권한과 필수 3개 도메인(`map.naver.com`, `pcmap.place.naver.com`, `www.modoodoc.com`) 외의 권한은 요구하지 않습니다.
-- 최근 열람 이력과 단기 캐시는 모두 사용자 브라우저의 `chrome.storage.local`에만 저장됩니다.
+- 검색 목록이 열릴 때는 외부 사이트에 자동 조회 요청을 보내지 않고(0건), 사용자가 병원을 열거나 `가격 비교`를 누른 병원만 조회합니다.
+- 회원가입, 로그인 쿠키, 별도 크롤링 백엔드 서버 없이 사용자 브라우저 내부에서만 동작합니다.
+- `storage` 권한과 필수 7개 공개 도메인(`map.naver.com`, `pcmap.place.naver.com`, `www.modoodoc.com`, `unni.app`, `www.gangnamunni.com`, `api.yeoshin.co.kr`, `web-api.babitalk.com`) 외의 권한은 요구하지 않습니다.
+- 최근 열람 이력과 단기 캐시는 모두 사용자 브라우저의 `chrome.storage.local`에만 저장합니다.
+
+<p align="center"><img src="assets/naver-detail.png" alt="네이버 지도 병원 상세 패널 상단에 삽입된 메디 브릿지 최저가 비교 카드" width="860"></p>
 
 ## 아키텍처와 핵심 설계
 
 ```mermaid
 flowchart LR
-    List["#searchIframe\n병원 목록 (외부 요청 0건)"] -->|"REGISTER_SEARCH_REGION_HINTS\n(최대 300건 FIFO)"| SW["Background Service Worker\ninFlight 병합 · 24h/30m 캐시"]
-    Entry["#entryIframe\n병원 상세 · /photo 서브탭"] -->|"FETCH_MODOODOC_SUMMARY"| SW
-    SW -->|"캐시 미스 시 단건 조회"| SSR["www.modoodoc.com\n공개 검색 __NEXT_DATA__"]
-    Web["apps/web 정적 번들\nCloudflare Workers (.cf-dist)"] -->|"RSC: 1 -> 404 · /intro -> / 301"| Landing["/ · /vat · /privacy\n안내 웹 · VAT 계산기"]
+    List["#searchIframe\n병원 목록 (초기 외부 요청 0건)"] -->|"REGISTER_SEARCH_REGION_HINTS\n(최대 300건 FIFO)"| SW["Background Service Worker\ninFlight 병합 · 병렬 수집 · 24h/30m 캐시"]
+    List -->|"가격 비교 클릭 -> 지도 내 비교 창"| SW
+    Entry["#entryIframe\n병원 상세 · /photo 서브탭"] -->|"FETCH_HOSPITAL_COMPARISON"| SW
+    SW -->|"Promise.allSettled (5s 타임아웃)"| Platforms["모두닥(신고 정가 포함) · 강남언니\n여신티켓 · 바비톡 실시간 파싱"]
+    Platforms -->|"rankOffersByEffectivePrice"| Sort["부가세 10% 포함 최저가순 정렬"]
+    Web["apps/web 정적 번들\nCloudflare Workers (.cf-dist)"] -->|"정적 HTML 서빙 · /intro -> / 301"| Landing["/ · /vat · /privacy\n안내 웹 · VAT 계산기 · ZIP 배포"]
 ```
 
-### 1. 크로스 프레임 행정구역 중계와 실시간 SSR 파싱
+### 1. 별도 서버 없이 4개 플랫폼 가격을 동시에 모으는 방식
 
-네이버 지도는 검색 목록(`#searchIframe`)과 병원 상세(`/home`, `/photo` 등이 열리는 `#entryIframe`)가 서로 다른 문서로 나뉘어 있습니다. 목록 썸네일을 눌러 사진 서브탭이 열리면 상세 화면에 주소와 진료과 표시가 빠지므로, 목록 프레임([apps/extension/src/entrypoints/naver-place.content/index.tsx](apps/extension/src/entrypoints/naver-place.content/index.tsx))에서 미리 뽑아 둔 `시/구` 힌트를 Service Worker([apps/extension/src/entrypoints/background.ts](apps/extension/src/entrypoints/background.ts))의 FIFO 맵(`MAX_SEARCH_REGION_HINTS = 300`)에 보관했다가 상세 탭 요청에 이어 붙입니다. 캐시에 없는 병원만 모두닥 공개 검색 페이지의 `__NEXT_DATA__` React Query 상태를 파싱하며, 같은 병원 중복 요청은 진행 중 Promise 하나로 병합하고 성공 결과는 24시간, 정상 미등록 결과는 30분 동안 캐시합니다.
+목록에서 `가격 비교`를 누르면 특정 플랫폼 새 탭으로 바로 이동하던 기존 방식을 버리고, `#searchIframe` 안에 Shadow DOM 패널([apps/extension/src/components/MediBridgeCompareDrawer.tsx](apps/extension/src/components/MediBridgeCompareDrawer.tsx))을 열도록 바꿨습니다. [apps/extension/src/entrypoints/background.ts](apps/extension/src/entrypoints/background.ts)의 서비스 워커가 진료과에 맞춰 대상 플랫폼을 `Promise.allSettled`(각 5초 타임아웃)로 한꺼번에 조회하고, 결과는 [packages/parsers](packages/parsers/src/index.ts)의 4개 파서가 각 사이트 공개 HTML(`__NEXT_DATA__`)과 JSON 응답에서 뽑아냅니다. 실제 새 탭 이동은 사용자가 목록에서 특정 플랫폼 시술 행을 직접 클릭했을 때만 실행합니다.
 
-### 2. 동명이원 오매칭 차단과 부정 캐시 오염 방어
+### 2. 부가세 10% 합산 정렬과 동명이원 구분
 
-부분 문자열 일치만으로는 접두 지역명이 다른 타 병원이 섞일 수 있어 [packages/shared/src/hospitalMatcher.ts](packages/shared/src/hospitalMatcher.ts)에서 `scoreNameMatch`를 정확 일치와 양방향 접두 일치(`startsWith` 80점)로 좁히고 `SIDO_MAP` 기반 행정구역 호환성을 교차 검증합니다. 상세 탭과 릴레이에서 모두 지역을 찾지 못한 상태라면 90점 미만 후보는 탈락시키고([packages/parsers/src/modoodocParser.ts](packages/parsers/src/modoodocParser.ts)), HTML 구조 오류(`parse_error`)나 지역 미확정 상태의 미등록(`not_found`)은 부정 캐시에 저장하지 않아 뒤늦게 도착하는 정상 조회가 막히지 않게 했습니다. 모두닥 미등록 병원이나 타 플랫폼 비교에는 진료과에 맞는 외부 검색 링크(`buildExternalPlatformLinks`)를 폴백 카드로 연결합니다.
+플랫폼마다 어떤 곳은 부가세를 포함해 적고 어떤 곳은 이벤트 가격만 먼저 노출한 뒤 `VAT 별도`를 작게 적습니다. [packages/shared/src/vatNormalizer.ts](packages/shared/src/vatNormalizer.ts)의 `rankOffersByEffectivePrice`가 별도 표기 상품에 10%를 가산해 실결제 금액 오름차순으로 줄 세우고, 상단 스위치로 표기가 기준 정렬과 즉시 비교할 수 있게 했습니다. 무료 검진이나 `0원` 상담 항목은 유료 시술 뒤로 내려 최저가 1위 자리를 덮지 않게 처리했습니다.
 
-### 3. 서브탭 고정 탭바 스페이서 앵커링과 Shadow DOM 격리
+동명이원 오매칭을 막기 위해 [packages/shared/src/hospitalMatcher.ts](packages/shared/src/hospitalMatcher.ts)의 `scoreNameMatch`와 `evaluateRegionCompatibility`로 시/도와 시/군/구가 맞지 않는 후보는 버립니다. 네트워크 오류나 HTML 구조가 깨진 응답(`parse_error`), 지역이 비어 있을 때의 미일치(`not_found`)는 캐시에 저장하지 않아 뒤이어 들어온 정상 조회가 막히지 않게 했습니다.
 
-사진이나 리뷰 서브탭에서는 상단 탭바(`.place_fixed_maintab`)가 고정되고 본문이 위로 스크롤되어 헤더 기준 노드가 화면 밖에 놓입니다. [apps/extension/src/adapters/naverEntryDom.ts](apps/extension/src/adapters/naverEntryDom.ts)의 `resolveSubTabAnchor`는 고정 탭바 뒤 빈 스페이서 요소 다음에 카드를 삽입하고 `previousElementSibling`이 달라지면 즉시 재정렬하며, 스폰서 광고 행(`.KJzzB .D1dXu`)은 [apps/extension/src/adapters/naverSearchListDom.ts](apps/extension/src/adapters/naverSearchListDom.ts)의 `resolveAdFallbackCategory`가 병원명과 함께 판별해 목록 칩이 누락되지 않게 합니다. 주입된 UI는 모두 Shadow DOM으로 감싸고 `:host { all: initial }` 리셋 위에서 폰트와 `16px` 서브탭 여백(`.mb-wrapper.is-subtab`)을 직접 지정합니다.
+### 3. 네이버 지도 다중 iframe 구조와 사진 탭 주소 전달
 
-### 4. 단일 쓰기 큐와 정적 Cloudflare Workers 서빙
+네이버 지도는 왼쪽 검색 목록(`#searchIframe`)과 오른쪽 병원 상세(`/home`, `/photo` 등이 열리는 `#entryIframe`)가 서로 다른 문서로 분리되어 있습니다. 목록 썸네일을 눌러 `/photo` 탭으로 들어가면 상세 문서에서 주소와 진료과 요소가 빠지기 때문에, 목록 문서([apps/extension/src/entrypoints/naver-place.content/index.tsx](apps/extension/src/entrypoints/naver-place.content/index.tsx))에서 먼저 뽑아 둔 `시/구` 정보를 서비스 워커의 FIFO 맵(`MAX_SEARCH_REGION_HINTS = 300`)에 보관했다가 상세 탭 조회에 이어 붙입니다. 모든 주입 UI는 WXT `createShadowRootUi`와 `:host { all: initial }`, `px` 고정 치수로 감싸 호스트 CSS의 `rem` 스케일 변경이나 스타일 간섭을 피합니다.
 
-Content script, 팝업, Service Worker가 동시에 `browser.storage.local`을 읽고 덮어쓰면 최근 열람 기록이 유실될 수 있으므로 [apps/extension/src/domain/bridgeStorage.ts](apps/extension/src/domain/bridgeStorage.ts)의 `enqueueWrite` FIFO Promise 큐로 이력 변이를 직렬화했습니다. 안내 웹(`apps/web`)은 Next.js 정적 빌드 산출물을 [apps/web/scripts/build-cf-bundle.mjs](apps/web/scripts/build-cf-bundle.mjs)로 조립해 Cloudflare Workers Static Assets에 올렸으며, Next.js 프리페치(`RSC: 1`) 헤더가 HTML을 받아 파싱 오류를 내지 않도록 [apps/web/cloudflare/worker.ts](apps/web/cloudflare/worker.ts)에서 404 폴백을 반환합니다. 부가세 10% 실질가 계산(`computeEffectivePrice`)과 천 단위 콤마 포맷(`formatPriceKRW`, `tabular-nums`)은 [packages/shared/src/vatNormalizer.ts](packages/shared/src/vatNormalizer.ts)에서 확장과 웹이 함께 씁니다.
+### 4. 로컬 저장소 쓰기 순서 보장과 정적 안내 웹
+
+Content Script, 팝업, 서비스 워커가 동시에 `chrome.storage.local`을 읽고 덮어쓰면 최근 본 병원 목록이 유실될 수 있어서 [apps/extension/src/domain/bridgeStorage.ts](apps/extension/src/domain/bridgeStorage.ts)의 `enqueueWrite` FIFO 큐로 쓰기 작업을 한 줄로 세웠습니다. 안내 웹(`apps/web`)은 Next.js 정적 빌드 산출물과 확장 ZIP 패키지를 [apps/web/scripts/build-cf-bundle.mjs](apps/web/scripts/build-cf-bundle.mjs)로 조립해 Cloudflare Workers Static Assets에 올립니다.
 
 ## 프로젝트 구성
 
-- **Chrome MV3 확장 (`apps/extension`)**: WXT, React 19, TypeScript, Tailwind CSS v4, Shadow DOM 오버레이 및 툴바 팝업
-- **정적 안내 웹 (`apps/web`)**: Next.js 16, React 19, Tailwind CSS v4, 공식 랜딩(`/`), 참고용 부가세 계산기(`/vat`), 개인정보처리방침(`/privacy`), Cloudflare Workers 정적 번들러
-- **공용 패키지 (`packages/*`)**: 도메인 매칭·VAT 계산(`shared`), 모두닥 SSR 파서(`parsers`), 공용 배지 토큰(`ui`)
-- **검증 및 CI (`.github/workflows/ci.yml`)**: TypeScript, Biome, Vitest, Chrome MV3 & 정적 웹 Playwright E2E
+- **Chrome MV3 확장 (`apps/extension`)**: WXT, React 19, TypeScript, Shadow DOM 오버레이, 지도 내 비교 패널 및 툴바 팝업
+- **정적 안내 웹 (`apps/web`)**: Next.js 16, React 19, Tailwind CSS v4, 공식 소개(`/`), 부가세 계산기(`/vat`), 개인정보처리방침(`/privacy`), 확장 ZIP 배포
+- **공용 패키지 (`packages/*`)**: 상호·지역 매칭 및 부가세 10% 최저가 정렬(`shared`), 4개 플랫폼 파서와 오프라인 픽스처(`parsers`), 디자인 토큰(`ui`)
+- **검증 및 CI (`.github/workflows/ci.yml`)**: TypeScript, Biome, Vitest, Chrome MV3 및 정적 웹 Playwright E2E
 
 ```text
 medi-bridge/
 ├── .github/workflows/ci.yml   PR·main 푸시 정적 검사, 빌드, 권한 검사, E2E 워크플로
 ├── apps/extension/            WXT Chrome MV3 확장 (Content Script, Background SW, Popup, E2E)
-├── apps/web/                  정적 랜딩, 부가세 시뮬레이터, 개인정보처리방침, Cloudflare Worker
-├── packages/shared/           접두 상호명 매칭, 행정구역 검증, VAT 10% 포맷, 플랫폼 URL 빌더
-├── packages/parsers/          모두닥 __NEXT_DATA__ SSR 파서 및 오프라인 픽스처 테스트
-├── packages/ui/               공용 디자인 토큰 및 SVG 브랜드 배지
-└── assets/                    안내 웹 및 스토어 미리보기 이미지
+├── apps/web/                  정적 안내 웹, 부가세 계산기, 개인정보처리방침, Cloudflare Worker
+├── packages/shared/           상호명·지역 매칭, 부가세 10% 정렬·포맷, 플랫폼 URL 빌더
+├── packages/parsers/          모두닥·강남언니·여신티켓·바비톡 파서 및 오프라인 픽스처 테스트
+├── packages/ui/               공용 색상 토큰 및 SVG 아이콘
+└── assets/                    네이버 지도 실제 적용 캡처 이미지
 ```
 
 ## 로컬 실행 및 검증
@@ -79,25 +85,24 @@ pnpm build
 pnpm zip:ext
 ```
 
-Chrome에서 로컬 확장 프로그램을 불러와 직접 확인하는 순서입니다.
+Chrome에서 로컬 확장 프로그램을 불러와 확인하는 순서입니다.
 
-1. 주소창에서 `chrome://extensions`로 이동해 우측 상단 **개발자 모드**를 켭니다.
+1. 주소창에 `chrome://extensions`를 입력하고 우측 상단 **개발자 모드**를 켭니다.
 2. **압축해제된 확장 프로그램을 로드합니다**를 눌러 `apps/extension/output/chrome-mv3` 폴더를 선택합니다.
-3. [네이버 지도](https://map.naver.com)에서 치과, 안과, 피부과, 성형외과, 정형외과 병원을 열고 상세·사진 탭 카드와 목록 칩을 확인합니다.
+3. [네이버 지도](https://map.naver.com)에서 치과, 안과, 피부과, 성형외과, 정형외과 병원을 검색해 목록 옆 `가격 비교` 버튼과 상세·사진 탭 카드를 확인합니다.
 
 | 명령 | 설명 |
 | --- | --- |
 | `pnpm verify` | 5개 워크스페이스 타입 체크, Biome 린트·포맷 검사, Vitest 단위 테스트 실행 |
 | `pnpm build` | 확장(`output/chrome-mv3`)과 Next.js 안내 웹 전체 빌드 |
-| `pnpm zip:ext` | Chrome Web Store 업로드용 ZIP 패키지(`apps/extension/output/`) 생성 |
-| `pnpm test:e2e` | 빌드된 Chrome MV3 확장(지역 중계 `/photo` 포함)과 정적 웹 Playwright E2E 실행 |
+| `pnpm zip:ext` | Chrome Web Store 및 안내 웹 배포용 ZIP 패키지(`apps/extension/output/`) 생성 |
+| `pnpm test:e2e` | 빌드된 Chrome MV3 확장(지도 내 비교 패널, 다중 플랫폼 최저가 정렬, `/photo` 릴레이 포함)과 정적 웹 Playwright E2E 실행 |
 | `pnpm --filter @medi-bridge/web run deploy:cf` | `.cf-dist` 정적 번들을 조립해 Cloudflare Workers에 배포 |
 
-CI 파이프라인([`.github/workflows/ci.yml`](.github/workflows/ci.yml))은 모든 Pull Request와 `main` 푸시에서 `pnpm verify`, 확장·정적 웹 빌드, `manifest.json` 최소 권한 검사, Playwright E2E를 순서대로 실행하며, `main` 푸시(또는 수동 실행) 시 저장소 시크릿 `CLOUDFLARE_API_TOKEN`이 등록되어 있으면 `.cf-dist`를 Cloudflare Workers로 자동 배포합니다.
+CI 파이프라인([`.github/workflows/ci.yml`](.github/workflows/ci.yml))은 모든 Pull Request와 `main` 푸시에서 `pnpm verify`, 확장·정적 웹 빌드, `manifest.json` 최소 권한 검사, Playwright E2E를 순서대로 실행합니다. `main` 푸시 시 저장소 시크릿 `CLOUDFLARE_API_TOKEN`이 등록되어 있으면 `.cf-dist`를 Cloudflare Workers로 자동 배포합니다.
 
-## 현재 상태와 검증 범위
+## 범위와 한계
 
-정적 안내 웹(`/`, `/vat`, `/privacy`, `/intro`→`/` 301 리다이렉트)은 Cloudflare Workers에 배포되어 있고, Chrome MV3 확장 빌드는 로컬 개발자 모드 테스트와 오프라인 E2E, 실제 네이버 플레이스 사진 서브탭 실통신 검증까지 마쳤습니다.
-
-- **직진입 및 외부 링크 범위**: 검색 목록 프레임을 거치지 않고 `/hospital/<id>/photo` 주소로 바로 들어가면 중계된 지역 힌트가 없어 90점 이상 완전·정규화 상호만 매칭하며, 모두닥 외 4개 플랫폼(강남언니, 여신티켓, 바비톡, 굿닥)은 진료과 맞춤형 검색 결과 페이지로 연결합니다.
-- **남은 출시 작업**: Chrome Web Store 심사 등록 후 발급되는 설치 URL을 안내 웹 상단 버튼과 설치 섹션에 반영할 예정입니다.
+- **굿닥과 `/photo` 직접 진입 범위**: 굿닥 상세 페이지 비급여 표는 클라이언트 렌더링 구조라 직접 파싱하지 않고 진료과에 맞는 병원 검색 링크(`goodoc.co.kr/hospitals?keyword=`)로 연결합니다. 검색 목록을 거치지 않고 `/hospital/<id>/photo` 주소로 바로 들어가면 중계된 지역 힌트가 없어 90점 이상 완전·정규 일치 상호만 매칭합니다.
+- **외부 사이트 구조 의존성**: 네이버 지도의 난독화 CSS 클래스나 각 플랫폼 공개 SSR/API 응답 필드가 바뀌면 [naverEntryDom.ts](apps/extension/src/adapters/naverEntryDom.ts), [naverSearchListDom.ts](apps/extension/src/adapters/naverSearchListDom.ts), [packages/parsers](packages/parsers/src/index.ts)의 셀렉터와 파서를 함께 갱신해야 합니다.
+- **스토어 심사 진행 상태**: Chrome Web Store 등록 심사 전에는 안내 웹(`/`)과 GitHub 저장소에서 체험용 ZIP 파일을 내려받아 개발자 모드로 로드해 사용합니다.

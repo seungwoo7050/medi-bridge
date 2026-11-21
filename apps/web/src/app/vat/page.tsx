@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type React from 'react';
 import { SavingsSimulator } from '@/components/SavingsSimulator';
 
@@ -11,20 +10,19 @@ export const metadata: Metadata = {
 
 export default function VatCalculatorPage(): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 space-y-6">
+    <div className="mx-auto max-w-4xl px-4 py-10 pb-16 space-y-6">
       <div className="space-y-2">
-        <Link
+        <a
           href="/"
-          className="inline-flex items-center gap-1 text-xs font-bold text-[#1E2456] hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E2456] hover:underline"
         >
           <span>← 확장프로그램 소개로 돌아가기</span>
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        </a>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">
           참고용 부가세 10% 실결제가 계산기
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 leading-relaxed break-keep">
-          확장프로그램이 자동으로 긁어오는 기능은 아니며, 병원·플랫폼별로 ‘부가세 별도’ 이벤트가를
-          볼 때 실제 결제 금액 순위가 어떻게 바뀌는지 미리 가늠해 보는 참고용 도구입니다.
+          부가세 별도 표기에 10%를 더했을 때 플랫폼별 최저가 순위가 어떻게 바뀌는지 계산합니다.
         </p>
       </div>
 

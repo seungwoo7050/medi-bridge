@@ -5,12 +5,12 @@
   --mb-indigo-surface: #252d6b;
   --mb-sage: #86b898;
   --mb-sage-deep: #2f6f55;
-  --mb-bg: #f6f7fb;
+  --mb-bg: #ffffff;
 }
 
 body {
   background-color: var(--mb-bg);
-  color: #111827;
+  color: #0f172a;
   font-family:
     "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", sans-serif;
@@ -18,10 +18,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.bento-glass {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  box-shadow:
-    0 8px 28px rgba(30, 36, 86, 0.08),
-    0 1px 3px rgba(30, 36, 86, 0.06);
+.mb-dark-stage {
+  background-color: #0f142e;
+  background-image:
+    radial-gradient(880px 520px at 18% 6%, rgba(45, 58, 134, 0.45), transparent 70%),
+    radial-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    24px 24px;
 }

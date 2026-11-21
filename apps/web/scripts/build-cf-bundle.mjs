@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const webRoot = resolve(import.meta.dirname, '..');
@@ -6,6 +6,7 @@ const nextAppDir = join(webRoot, '.next', 'server', 'app');
 const nextStaticDir = join(webRoot, '.next', 'static');
 const publicDir = join(webRoot, 'public');
 const distDir = join(webRoot, '.cf-dist');
+const extOutputDir = resolve(webRoot, '../extension/output');
 
 if (!existsSync(nextAppDir)) {
   throw new Error(`Next build output missing at ${nextAppDir}. Run next build first.`);
@@ -16,6 +17,15 @@ mkdirSync(distDir, { recursive: true });
 
 if (existsSync(publicDir)) {
   cpSync(publicDir, distDir, { recursive: true });
+}
+
+if (existsSync(extOutputDir)) {
+  const zipName = readdirSync(extOutputDir).find((name) => name.endsWith('-chrome.zip'));
+  if (zipName) {
+    const downloadsDir = join(distDir, 'downloads');
+    mkdirSync(downloadsDir, { recursive: true });
+    cpSync(join(extOutputDir, zipName), join(downloadsDir, 'medi-bridge-chrome-mv3.zip'));
+  }
 }
 
 if (existsSync(nextStaticDir)) {

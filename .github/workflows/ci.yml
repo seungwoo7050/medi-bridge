@@ -38,8 +38,10 @@ jobs:
       - name: 확장프로그램·정적 웹 빌드 및 패키징
         run: |
           pnpm build
-          pnpm --filter @medi-bridge/web run build:cf
           pnpm zip:ext
+          mkdir -p apps/web/public/downloads
+          cp apps/extension/output/*-chrome.zip apps/web/public/downloads/medi-bridge-chrome-mv3.zip
+          pnpm --filter @medi-bridge/web run build:cf
 
       - name: 확장 매니페스트 최소 권한 및 정적 번들 검증
         run: |
@@ -50,6 +52,7 @@ jobs:
           test -f apps/web/.cf-dist/index.html
           test -f apps/web/.cf-dist/vat/index.html
           test -f apps/web/.cf-dist/privacy/index.html
+          test -f apps/web/.cf-dist/downloads/medi-bridge-chrome-mv3.zip
 
       - name: Playwright Chromium 설치
         run: pnpm --filter @medi-bridge/extension exec playwright install --with-deps chromium

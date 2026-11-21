@@ -127,7 +127,7 @@ export function SavingsSimulator(): React.JSX.Element {
             {lowest ? `${lowest.platform} ${formatPriceKRW(lowest.effective)}` : '-'}
           </p>
           <p className="text-[11px] text-slate-500">
-            {includeVat ? '숨은 부가세 10% 자동 합산' : '부가세 별도 광고 표기 기준'}
+            {includeVat ? '부가세 10% 합산 기준' : '부가세 별도 광고 표기 기준'}
           </p>
         </div>
 
