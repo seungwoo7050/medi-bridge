@@ -8,7 +8,8 @@
 }
 
 .mb-wrapper,
-.mb-list-chip-wrapper {
+.mb-list-chip-wrapper,
+.mb-compare-drawer-backdrop {
   font-family:
     "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", sans-serif;
@@ -42,7 +43,6 @@
   font-weight: 600;
   line-height: 16px;
   text-decoration: none;
-  cursor: pointer;
   box-sizing: border-box;
   box-shadow: 0 2px 8px rgba(30, 36, 86, 0.08);
 }
@@ -102,6 +102,51 @@
   color: #1e2456;
 }
 
+.mb-vat-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid #d5dcf0;
+  background-color: #ffffff;
+  color: #4b5563;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mb-vat-toggle.is-on {
+  background-color: #1e2456;
+  border-color: #1e2456;
+  color: #ffffff;
+}
+
+.mb-matched-platforms {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.mb-platform-summary-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e2456;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mb-platform-summary-link:hover {
+  text-decoration: underline;
+}
+
 .mb-rating {
   font-size: 11px;
   font-weight: 700;
@@ -110,43 +155,55 @@
 }
 
 .mb-reviews {
-  font-size: 11px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
-  color: #4b5563;
-}
-
-.mb-primary-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background-color: #1e2456;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
-  text-decoration: none;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.mb-primary-cta:hover {
-  background-color: #252d6b;
+  color: #6b7280;
 }
 
 .mb-tags-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .mb-tag-chip {
   font-size: 10.5px;
-  color: #1e2456;
-  background-color: #eef0fa;
-  border-radius: 5px;
-  padding: 2px 7px;
+  font-weight: 600;
+  color: #4b5563;
   font-variant-numeric: tabular-nums;
+}
+
+.mb-comparison-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mb-treatment-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 0;
+  border-bottom: 1px solid #eef0f6;
+}
+
+.mb-treatment-tab {
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 4px 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mb-treatment-tab.is-active {
+  border-bottom-color: #1e2456;
+  color: #1e2456;
+  font-weight: 800;
 }
 
 .mb-offers-list {
@@ -160,27 +217,54 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 7px 2px;
+  padding: 8px 2px;
   border-bottom: 1px solid #eef0f6;
   color: #111827;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mb-offer-row:hover {
+  background-color: #f8fafc;
 }
 
 .mb-price-left {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
   flex: 1;
 }
 
-.mb-price-badge {
-  font-size: 9.5px;
+.mb-platform-pill {
+  font-size: 10px;
   font-weight: 700;
   color: #1e2456;
   background-color: #eef0fa;
-  padding: 1px 5px;
-  border-radius: 4px;
+  padding: 2px 6px;
+  border-radius: 5px;
   flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.mb-platform-pill[data-platform="gangnamunni"] {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.mb-platform-pill[data-platform="yeoshin"] {
+  background-color: #fce7f3;
+  color: #9d174d;
+}
+
+.mb-platform-pill[data-platform="babitalk"] {
+  background-color: #ede9fe;
+  color: #5b21b6;
+}
+
+.mb-platform-pill[data-platform="hira"] {
+  background-color: #f1f5f9;
+  color: #475569;
 }
 
 .mb-ssr-name {
@@ -199,22 +283,26 @@
   flex-shrink: 0;
 }
 
-.mb-savings-pill {
-  font-size: 10px;
-  font-weight: 700;
+.mb-discount-text {
+  font-size: 10.5px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: #2f6f55;
-  background-color: #dcfce7;
-  padding: 1px 5px;
-  border-radius: 4px;
+  color: #1b5e43;
 }
 
 .mb-hira-price {
-  font-size: 11px;
-  color: #6b7280;
+  font-size: 10.5px;
+  color: #9ca3af;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-decoration: line-through;
+}
+
+.mb-offer-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
 }
 
 .mb-offer-price {
@@ -223,20 +311,44 @@
   font-variant-numeric: tabular-nums;
   color: #111827;
   text-align: right;
+  white-space: nowrap;
+}
+
+.mb-offer-price.is-lowest {
+  color: #1b5e43;
+}
+
+.mb-vat-note {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
 }
 
 .mb-more-link {
   display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
   text-align: right;
-  padding-top: 6px;
+  padding: 6px 0 2px 0;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 700;
   color: #1e2456;
-  text-decoration: none;
+  cursor: pointer;
 }
 
 .mb-more-link:hover {
   text-decoration: underline;
+}
+
+.mb-empty-offers,
+.mb-drawer-loading {
+  margin: 0;
+  padding: 14px 2px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #4b5563;
 }
 
 /* 타 플랫폼 1-클릭 검색 칩 행 */
@@ -246,7 +358,8 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 6px;
-  padding-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #eef0f6;
 }
 
 .mb-ext-links-label {
@@ -259,26 +372,22 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .mb-ext-chip {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  background-color: #f8fafc;
-  border: 1px solid #d5dcf0;
+  padding: 2px 6px;
   color: #1e2456;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
 }
 
 .mb-ext-chip:hover {
-  background-color: #eef0fa;
-  border-color: #1e2456;
+  text-decoration: underline;
 }
 
 /* 미매칭 병원 1-클릭 플랫폼 폴백 카드 */
@@ -306,24 +415,6 @@
   color: #6b7280;
 }
 
-.mb-fallback-modoodoc {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 9px;
-  border-radius: 7px;
-  background-color: #1e2456;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
-  text-decoration: none;
-  flex-shrink: 0;
-  cursor: pointer;
-}
-
-.mb-fallback-modoodoc:hover {
-  background-color: #252d6b;
-}
-
 /* 검색 목록 인라인 칩 */
 .mb-list-chip-wrapper {
   display: flex;
@@ -344,9 +435,9 @@
   font-size: 11px;
   font-weight: 700;
   line-height: 15px;
-  text-decoration: none;
   cursor: pointer;
   box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
 }
 
 .mb-list-chip:hover {
@@ -354,16 +445,28 @@
   border-color: #1e2456;
 }
 
+.mb-list-chip.is-active {
+  background-color: #1e2456;
+  border-color: #1e2456;
+  color: #ffffff;
+}
+
 .mb-list-chip-icon {
   display: inline-flex;
   align-items: center;
-  color: #1e2456;
+  color: currentColor;
 }
 
 .mb-list-chip.is-visited {
   background-color: #eff7f2;
   border-color: #86b898;
-  color: #2f6f55;
+  color: #1b5e43;
+}
+
+.mb-list-chip.is-visited.is-active {
+  background-color: #1b5e43;
+  border-color: #1b5e43;
+  color: #ffffff;
 }
 
 .mb-list-chip-check {
@@ -371,12 +474,103 @@
   font-weight: 800;
 }
 
-.mb-list-chip-arrow {
-  font-size: 10px;
-  opacity: 0.75;
+/* 검색 목록 프레임 내 인앱 통합 가격 비교 드로어 */
+.mb-compare-drawer-backdrop {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2147483000;
+  pointer-events: auto;
 }
 
-.mb-list-chip.is-opening {
-  opacity: 0.7;
-  pointer-events: none;
+.mb-compare-drawer {
+  width: 100%;
+  max-height: 76vh;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  border: 1px solid #c7ceeb;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow:
+    0 14px 36px rgba(17, 24, 39, 0.22),
+    0 2px 6px rgba(30, 36, 86, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mb-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef0f6;
+}
+
+.mb-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mb-drawer-titles {
+  min-width: 0;
+}
+
+.mb-drawer-hospital {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mb-drawer-meta {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mb-drawer-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mb-drawer-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mb-drawer-close:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.mb-drawer-body {
+  overflow-y: auto;
+  max-height: 52vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }

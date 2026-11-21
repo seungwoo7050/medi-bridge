@@ -195,6 +195,24 @@ export interface ExternalPlatformLink {
   readonly url: string;
 }
 
+export type CollectablePlatformSource = 'modoodoc' | 'gangnamunni' | 'yeoshin' | 'babitalk';
+
+/**
+ * 진료과 특성에 맞춰 실시간 가격 수집을 수행할 플랫폼 우선순위 목록을 반환합니다.
+ */
+export function resolveTargetPlatformsForDepartment(
+  department = '',
+): readonly CollectablePlatformSource[] {
+  const normalizedDept = normalizeDepartmentCategory(department);
+  if (normalizedDept === '피부과' || normalizedDept === '성형외과') {
+    return ['modoodoc', 'gangnamunni', 'yeoshin', 'babitalk'];
+  }
+  if (normalizedDept === '안과' || normalizedDept === '치과') {
+    return ['modoodoc', 'gangnamunni', 'yeoshin'];
+  }
+  return ['modoodoc'];
+}
+
 /**
  * 진료과 특성에 맞춰 동일 병원명·지역 기반 외부 비급여 플랫폼 검색 링크 목록을 생성합니다.
  */
@@ -211,22 +229,22 @@ export function buildExternalPlatformLinks(
   const gangnamunni: ExternalPlatformLink = {
     platform: 'gangnamunni',
     label: '강남언니',
-    url: `https://www.gangnamunni.com/events?q=${encodeURIComponent(cleanName)}`,
+    url: `https://unni.app/search?q=${encodeURIComponent(cleanName)}`,
   };
   const yeoshin: ExternalPlatformLink = {
     platform: 'yeoshin',
     label: '여신티켓',
-    url: `https://www.yeoshin.co.kr/search/main?q=${encodeURIComponent(cleanName)}`,
+    url: `https://www.yeoshin.co.kr/search/category?q=${encodeURIComponent(cleanName)}`,
   };
   const babitalk: ExternalPlatformLink = {
     platform: 'babitalk',
     label: '바비톡',
-    url: `https://web.babitalk.com/search?keyword=${encodeURIComponent(cleanName)}`,
+    url: `https://babitalk.com/search?keyword=${encodeURIComponent(cleanName)}`,
   };
   const goodoc: ExternalPlatformLink = {
     platform: 'goodoc',
     label: '굿닥',
-    url: `https://www.goodoc.co.kr/search?keyword=${encodeURIComponent(regionQuery)}`,
+    url: `https://www.goodoc.co.kr/hospitals?keyword=${encodeURIComponent(regionQuery)}`,
   };
 
   if (normalizedDept === '피부과' || normalizedDept === '성형외과') {

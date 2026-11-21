@@ -98,10 +98,28 @@ export function rankOffersByEffectivePrice(
     const effectiveExcluded = computeEffectivePrice(offer.listedPrice, offer.vatIncluded, false);
     const effectivePrice = displayIncludeVat ? effectiveIncluded : effectiveExcluded;
     const hiraBaselinePrice = baselineByTreatmentCode[offer.treatmentCode] ?? null;
+    const rawOriginal =
+      typeof offer.originalPrice === 'number' && offer.originalPrice > offer.listedPrice
+        ? offer.originalPrice
+        : null;
+    const computedOriginal =
+      rawOriginal !== null
+        ? computeEffectivePrice(rawOriginal, offer.vatIncluded, displayIncludeVat)
+        : null;
+    const displayOriginalPrice =
+      computedOriginal !== null && computedOriginal > effectivePrice
+        ? computedOriginal
+        : hiraBaselinePrice !== null && hiraBaselinePrice > effectivePrice
+          ? hiraBaselinePrice
+          : null;
     const { savingsAmount, savingsPercent } = computeSavingsVsBaseline(
       effectivePrice,
       hiraBaselinePrice,
     );
+    const discountPercent =
+      displayOriginalPrice !== null && displayOriginalPrice > effectivePrice && effectivePrice > 0
+        ? Math.round(((displayOriginalPrice - effectivePrice) / displayOriginalPrice) * 100)
+        : Math.max(0, savingsPercent);
 
     return {
       ...offer,
@@ -110,6 +128,8 @@ export function rankOffersByEffectivePrice(
       effectivePriceVatIncluded: effectiveIncluded,
       effectivePriceVatExcluded: effectiveExcluded,
       hiraBaselinePrice,
+      displayOriginalPrice,
+      discountPercent,
       savingsAmount,
       savingsPercent,
       isLowest: false,
@@ -117,6 +137,11 @@ export function rankOffersByEffectivePrice(
   });
 
   mapped.sort((a, b) => {
+    const aZero = a.effectivePrice <= 0 ? 1 : 0;
+    const bZero = b.effectivePrice <= 0 ? 1 : 0;
+    if (aZero !== bZero) {
+      return aZero - bZero;
+    }
     if (a.effectivePrice !== b.effectivePrice) {
       return a.effectivePrice - b.effectivePrice;
     }

@@ -1,0 +1,31 @@
+{
+  "actions": null,
+  "code": "SUCCESS",
+  "message": "성공",
+  "payload": {
+    "hospitals": [
+      {
+        "id": 4439,
+        "name": "톡스앤필의원(강남본점)",
+        "address": "서울특별시 서초구 강남대로 415"
+      },
+      {
+        "id": 9991,
+        "name": "톡스앤필의원(부산서면점)",
+        "address": "부산광역시 부산진구 중앙대로 700"
+      }
+    ],
+    "hospitalStats": [
+      {
+        "hospitalId": 4439,
+        "starPointAverage": 9.2,
+        "reviewCount": 6309
+      },
+      {
+        "hospitalId": 9991,
+        "starPointAverage": 8.8,
+        "reviewCount": 420
+      }
+    ]
+  }
+}

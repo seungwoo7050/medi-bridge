@@ -1,0 +1,49 @@
+{
+  "actions": null,
+  "code": "SUCCESS",
+  "message": "성공",
+  "payload": {
+    "salesEvents": [
+      {
+        "id": 18757,
+        "hospitalId": 4439,
+        "name": "코어톡스 50U",
+        "representativeSalesProductId": 299141,
+        "trash": false,
+        "use": true,
+        "view": true
+      },
+      {
+        "id": 18758,
+        "hospitalId": 4439,
+        "name": "삭제된 이벤트",
+        "representativeSalesProductId": 299142,
+        "trash": true,
+        "use": true,
+        "view": true
+      }
+    ],
+    "salesProducts": [
+      {
+        "id": 299141,
+        "salesEventId": 18757,
+        "currency": "KRW",
+        "name": "사각턱 코어톡스 50U",
+        "price": 59000,
+        "discountPrice": 39000,
+        "oneTimeRegularPrice": 79000,
+        "view": true
+      },
+      {
+        "id": 299142,
+        "salesEventId": 18758,
+        "currency": "KRW",
+        "name": "삭제된 상품",
+        "price": 10000,
+        "discountPrice": 10000,
+        "oneTimeRegularPrice": 10000,
+        "view": true
+      }
+    ]
+  }
+}

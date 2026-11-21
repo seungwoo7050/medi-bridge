@@ -10,17 +10,21 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: '메디 브릿지 (MEDI BRIDGE) — 네이버 지도 실시간 비급여·리뷰 비교',
+    name: '메디 브릿지 (MEDI BRIDGE) — 네이버 지도 실시간 비급여 최저가 비교',
     short_name: '메디 브릿지',
     description:
-      '네이버 지도에서 병·의원 상세를 열면 모두닥 비급여·이벤트 가격과 인증리뷰를 즉시 띄우고 타 플랫폼(강남언니·여신티켓·바비톡·굿닥) 검색으로 연결합니다.',
+      '네이버 지도에서 병·의원을 선택하면 모두닥·강남언니·여신티켓·바비톡 비급여 가격을 실시간 수집해 부가세 포함 최저가순으로 비교합니다.',
     version: '1.0.0',
-    // 최소 권한 원칙: 로컬 설정·캐시 저장을 위한 storage와 네이버 지도·모두닥 호스트만 선언
+    // 최소 권한 원칙: 로컬 설정·캐시 저장을 위한 storage와 네이버 지도 및 공개 의료 플랫폼 호스트만 선언
     permissions: ['storage'],
     host_permissions: [
       'https://map.naver.com/*',
       'https://pcmap.place.naver.com/*',
       'https://www.modoodoc.com/*',
+      'https://unni.app/*',
+      'https://www.gangnamunni.com/*',
+      'https://api.yeoshin.co.kr/*',
+      'https://web-api.babitalk.com/*',
     ],
     action: {
       default_title: '메디 브릿지 (MEDI BRIDGE)',

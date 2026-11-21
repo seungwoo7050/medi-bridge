@@ -12,9 +12,8 @@ import {
   markHospitalClickedViaWorker,
   removeRecentHospitalViaWorker,
 } from '../../domain/historyGateway';
-import { buildModoodocSearchUrl } from '../../domain/modoodocUrl';
 import { WEB_APP_URL } from '../../domain/serviceUrls';
-import type { OpenModoodocHospitalRequest, RecentHospitalRecord } from '../../types/place';
+import type { RecentHospitalRecord } from '../../types/place';
 
 function formatRelativeTime(timestamp: number): string {
   const diffMs = Math.max(0, Date.now() - timestamp);
@@ -88,42 +87,24 @@ export function PopupApp(): React.JSX.Element {
     if (!trimmed) {
       return;
     }
-    const targetUrl = buildModoodocSearchUrl(trimmed);
+    const targetUrl = `https://map.naver.com/p/search/${encodeURIComponent(trimmed)}`;
     setSearchInput('');
     await openExternalTab(targetUrl);
   };
 
   const handleOpenHistoryItem = async (record: RecentHospitalRecord) => {
-    if (record.summary?.detailUrl) {
-      const updated = await markHospitalClickedViaWorker({
-        name: record.name,
-        department: record.department,
-        regionHint: record.regionHint,
-      });
-      setRecentHospitals(updated);
-      await openExternalTab(record.summary.detailUrl);
-      return;
-    }
+    const fallbackNaverQuery = [record.regionHint, record.name].filter(Boolean).join(' ').trim();
+    const targetUrl =
+      record.summary?.detailUrl ??
+      `https://map.naver.com/p/search/${encodeURIComponent(fallbackNaverQuery)}`;
 
-    const req: OpenModoodocHospitalRequest = {
-      type: 'OPEN_MODOODOC_HOSPITAL',
-      hospitalName: record.name,
-      regionHint: record.regionHint,
+    const updated = await markHospitalClickedViaWorker({
+      name: record.name,
       department: record.department,
-    };
-
-    try {
-      await browser.runtime.sendMessage(req);
-      await loadState();
-    } catch {
-      const updated = await markHospitalClickedViaWorker({
-        name: record.name,
-        department: record.department,
-        regionHint: record.regionHint,
-      });
-      setRecentHospitals(updated);
-      await openExternalTab(record.searchUrl);
-    }
+      regionHint: record.regionHint,
+    });
+    setRecentHospitals(updated);
+    await openExternalTab(targetUrl);
   };
 
   const handleRemoveItem = async (event: React.MouseEvent<HTMLButtonElement>, id: string) => {

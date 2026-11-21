@@ -50,10 +50,13 @@ vi.mock('wxt/browser', () => ({
 }));
 
 import {
+  attachComparisonToRecentHospital,
   attachSummaryToRecentHospital,
   clearRecentHospitals,
   getBridgeState,
+  getCachedHospitalComparison,
   getCachedHospitalSummary,
+  getVatIncluded,
   MAX_RECENT_HOSPITALS,
   markHospitalClicked,
   RECENT_HOSPITALS_KEY,
@@ -62,11 +65,14 @@ import {
   SUMMARY_HIT_TTL_MS,
   SUMMARY_MISS_TTL_MS,
   setBridgeEnabled,
+  setCachedHospitalComparison,
   setCachedHospitalSummary,
+  setVatIncluded,
   subscribeBridgeEnabled,
   subscribeRecentHospitals,
+  toPreviewFromComparison,
 } from '../src/domain/bridgeStorage';
-import type { ModoodocHospitalSummary } from '../src/types/place';
+import type { HospitalComparisonResult, ModoodocHospitalSummary } from '../src/types/place';
 
 const SAMPLE_SUMMARY: ModoodocHospitalSummary = {
   hospitalId: 86566,
@@ -296,5 +302,93 @@ describe('동시 갱신', () => {
 
     expect((await getCachedHospitalSummary('강남케이안과의원', '서울 강남구')).hit).toBe(true);
     expect((await getCachedHospitalSummary('미등록의원', '서울 서초구')).hit).toBe(true);
+  });
+
+  it('다중 플랫폼 비교 캐시·VAT 포함 설정 및 최저가 미리보기 변환이 정확히 동작한다', async () => {
+    expect(await getVatIncluded()).toBe(true);
+    await setVatIncluded(false);
+    expect(await getVatIncluded()).toBe(false);
+
+    const comparison: HospitalComparisonResult = {
+      hospitalName: '드라마치과병원',
+      regionHint: '경기 성남시',
+      department: '치과',
+      matchedPlatforms: [
+        {
+          platform: 'modoodoc',
+          platformLabel: '모두닥',
+          status: 'matched',
+          hospitalUrl: 'https://www.modoodoc.com/hospital/17593',
+          rating: 9.2,
+          ratingScale: 10,
+          reviewCount: 418,
+          offerCount: 1,
+        },
+        {
+          platform: 'gangnamunni',
+          platformLabel: '강남언니',
+          status: 'matched',
+          hospitalUrl: 'https://unni.app/hospitals/9001',
+          rating: 9.5,
+          ratingScale: 10,
+          reviewCount: 120,
+          offerCount: 1,
+        },
+      ],
+      rawOffers: [
+        {
+          id: 'gangnamunni-1',
+          platform: 'gangnamunni',
+          treatmentCode: 'DENT_IMPLANT',
+          treatmentName: '국산 임플란트',
+          rawTitle: '임플란트 특가 (VAT별도)',
+          listedPrice: 1_950_000,
+          vatIncluded: false,
+          badge: '특가',
+          bookingUrl: 'https://unni.app/events/9001',
+          updatedAt: '실시간',
+        },
+        {
+          id: 'modoodoc-1',
+          platform: 'modoodoc',
+          treatmentCode: 'DENT_IMPLANT',
+          treatmentName: '국산 임플란트',
+          rawTitle: '오스템 임플란트',
+          listedPrice: 2_090_000,
+          vatIncluded: true,
+          badge: '이벤트',
+          bookingUrl: 'https://www.modoodoc.com/hospital/17593',
+          updatedAt: '실시간',
+        },
+      ],
+      hiraBaselines: { DENT_IMPLANT: 3_500_000 },
+      topTreatments: [{ name: '임플란트', count: 142 }],
+      fetchedAt: Date.now(),
+    };
+
+    const previewVatOn = toPreviewFromComparison(comparison, true);
+    expect(previewVatOn.platformLabel).toBe('모두닥');
+    expect(previewVatOn.representativePrice).toBe('2,090,000원');
+
+    const previewVatOff = toPreviewFromComparison(comparison, false);
+    expect(previewVatOff.platformLabel).toBe('강남언니');
+    expect(previewVatOff.representativePrice).toBe('1,950,000원');
+
+    await setCachedHospitalComparison('드라마치과병원', '경기 성남시', comparison);
+    const cached = await getCachedHospitalComparison('드라마치과병원', '경기 성남시');
+    expect(cached.hit).toBe(true);
+    expect(cached.comparison?.matchedPlatforms).toHaveLength(2);
+
+    await recordHospitalView({
+      name: '드라마치과병원',
+      department: '치과',
+      regionHint: '경기 성남시',
+    });
+    const updated = await attachComparisonToRecentHospital(
+      '드라마치과병원',
+      '경기 성남시',
+      comparison,
+    );
+    expect(updated[0]?.summary?.platformLabel).toBe('강남언니');
   });
 });

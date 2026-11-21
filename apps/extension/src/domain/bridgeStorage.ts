@@ -1,7 +1,14 @@
+import {
+  formatPriceKRW,
+  type HospitalComparisonResult,
+  HospitalComparisonResultSchema,
+  rankOffersByEffectivePrice,
+} from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { toHospitalPreviewSummary } from '../adapters/modoodocSearchParser';
 import type {
   BridgeStorageState,
+  CachedComparisonEntry,
   CachedModoodocEntry,
   HospitalPreviewSummary,
   ModoodocHospitalSummary,
@@ -17,6 +24,8 @@ import {
 export const BRIDGE_ENABLED_KEY = 'bridgeEnabled';
 export const RECENT_HOSPITALS_KEY = 'recentHospitals';
 export const SUMMARY_CACHE_KEY = 'modoodocSummaryCache';
+export const COMPARISON_CACHE_KEY = 'mediBridgeMultiComparisonCache';
+export const VAT_INCLUDED_KEY = 'mediBridgeVatIncluded';
 
 export const MAX_RECENT_HOSPITALS = 20;
 export const MAX_SUMMARY_CACHE = 60;
@@ -117,6 +126,105 @@ function parseSummaryCache(raw: unknown): CachedModoodocEntry[] {
   return raw.filter(isCachedModoodocEntry).slice(0, MAX_SUMMARY_CACHE);
 }
 
+function isCachedComparisonEntry(value: unknown): value is CachedComparisonEntry {
+  if (!isRecordObject(value)) {
+    return false;
+  }
+  if (typeof value.key !== 'string' || typeof value.fetchedAt !== 'number') {
+    return false;
+  }
+  if (value.comparison === null) {
+    return true;
+  }
+  return HospitalComparisonResultSchema.safeParse(value.comparison).success;
+}
+
+function parseComparisonCache(raw: unknown): CachedComparisonEntry[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter(isCachedComparisonEntry).slice(0, MAX_SUMMARY_CACHE);
+}
+
+export function toPreviewFromComparison(
+  comparison: HospitalComparisonResult,
+  includeVat = true,
+): HospitalPreviewSummary {
+  const ranked = rankOffersByEffectivePrice(
+    comparison.rawOffers,
+    includeVat,
+    comparison.hiraBaselines,
+  );
+  const paidOffers = ranked.filter((offer) => offer.effectivePrice > 0);
+  const bestOffer = paidOffers.find((offer) => offer.platform !== 'hira') ?? paidOffers[0] ?? null;
+
+  const matchedWithInfo = [...comparison.matchedPlatforms]
+    .filter((item) => item.status === 'matched' && item.platform !== 'hira')
+    .sort((a, b) => b.reviewCount - a.reviewCount);
+  const topMatched = matchedWithInfo[0] ?? null;
+  const ratedMatched = matchedWithInfo.find((item) => item.rating !== null) ?? null;
+
+  const normalizedScore =
+    ratedMatched && ratedMatched.rating !== null
+      ? ratedMatched.ratingScale === 5
+        ? Number((ratedMatched.rating * 2).toFixed(1))
+        : ratedMatched.rating
+      : null;
+
+  const totalReviewCount = matchedWithInfo.reduce((acc, item) => acc + item.reviewCount, 0);
+  const fallbackSearchQuery = [comparison.regionHint, comparison.hospitalName]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const detailUrl =
+    bestOffer?.bookingUrl ??
+    topMatched?.hospitalUrl ??
+    `https://map.naver.com/p/search/${encodeURIComponent(fallbackSearchQuery)}`;
+
+  return {
+    detailUrl,
+    totalScore: normalizedScore,
+    reviewCount: totalReviewCount,
+    representativeTreatment: bestOffer
+      ? bestOffer.rawTitle
+      : (comparison.topTreatments[0]?.name ?? null),
+    representativePrice: bestOffer
+      ? `${formatPriceKRW(bestOffer.effectivePrice)}${bestOffer.hasRange ? '~' : ''}`
+      : null,
+    platformLabel: bestOffer?.platformLabel ?? topMatched?.platformLabel ?? null,
+  };
+}
+
+export async function getVatIncluded(): Promise<boolean> {
+  const stored = await browser.storage.local.get(VAT_INCLUDED_KEY);
+  const raw = stored[VAT_INCLUDED_KEY];
+  return typeof raw === 'boolean' ? raw : true;
+}
+
+export async function setVatIncluded(includeVat: boolean): Promise<void> {
+  await browser.storage.local.set({ [VAT_INCLUDED_KEY]: includeVat });
+}
+
+export function subscribeVatIncluded(onChange: (includeVat: boolean) => void): () => void {
+  const listener = (
+    changes: Record<string, { newValue?: unknown; oldValue?: unknown }>,
+    areaName: string,
+  ) => {
+    if (areaName !== 'local') {
+      return;
+    }
+    const change = changes[VAT_INCLUDED_KEY];
+    if (change && typeof change.newValue === 'boolean') {
+      onChange(change.newValue);
+    }
+  };
+
+  browser.storage.onChanged.addListener(listener);
+  return () => {
+    browser.storage.onChanged.removeListener(listener);
+  };
+}
+
 export async function getBridgeState(): Promise<BridgeStorageState> {
   const stored = await browser.storage.local.get([BRIDGE_ENABLED_KEY, RECENT_HOSPITALS_KEY]);
 
@@ -148,11 +256,26 @@ async function upsertHospitalHistoryUnlocked(
   const id = buildHospitalKey(cleanName, cleanRegion);
   const searchUrl = buildModoodocSearchUrl(cleanName, cleanRegion);
 
-  const stored = await browser.storage.local.get([RECENT_HOSPITALS_KEY, SUMMARY_CACHE_KEY]);
+  const stored = await browser.storage.local.get([
+    RECENT_HOSPITALS_KEY,
+    SUMMARY_CACHE_KEY,
+    COMPARISON_CACHE_KEY,
+  ]);
   const existingList = parseRecentHospitals(stored[RECENT_HOSPITALS_KEY]);
   const existingRecord = existingList.find((item) => item.id === id);
 
   let resolvedSummary = existingRecord?.summary ?? null;
+  if (resolvedSummary === null) {
+    const compCache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+    const cachedComp = compCache.find((item) => item.key === id);
+    if (
+      cachedComp &&
+      cachedComp.comparison !== null &&
+      Date.now() - cachedComp.fetchedAt < SUMMARY_HIT_TTL_MS
+    ) {
+      resolvedSummary = toPreviewFromComparison(cachedComp.comparison, true);
+    }
+  }
   if (resolvedSummary === null) {
     const cache = parseSummaryCache(stored[SUMMARY_CACHE_KEY]);
     const cachedEntry = cache.find((item) => item.key === id);
@@ -360,4 +483,75 @@ export function attachSummaryToRecentHospital(
   return enqueueWrite(() =>
     attachPreviewToRecentHospitalUnlocked(name, regionHint, toHospitalPreviewSummary(summary)),
   );
+}
+
+export async function getCachedHospitalComparison(
+  name: string,
+  regionHint: string,
+): Promise<{ hit: boolean; comparison: HospitalComparisonResult | null }> {
+  const cleanName = normalizeHospitalName(name);
+  const cleanRegion = extractRegionHintFromAddress(regionHint);
+  const key = buildHospitalKey(cleanName, cleanRegion);
+
+  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
+  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+  const entry = cache.find((item) => item.key === key);
+
+  if (!entry) {
+    return { hit: false, comparison: null };
+  }
+
+  const age = Date.now() - entry.fetchedAt;
+  const maxTtl = entry.comparison !== null ? SUMMARY_HIT_TTL_MS : SUMMARY_MISS_TTL_MS;
+  if (age >= maxTtl) {
+    return { hit: false, comparison: null };
+  }
+
+  return { hit: true, comparison: entry.comparison };
+}
+
+async function setCachedHospitalComparisonUnlocked(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonResult | null,
+): Promise<void> {
+  const cleanName = normalizeHospitalName(name);
+  const cleanRegion = extractRegionHintFromAddress(regionHint);
+  const key = buildHospitalKey(cleanName, cleanRegion);
+
+  const stored = await browser.storage.local.get(COMPARISON_CACHE_KEY);
+  const cache = parseComparisonCache(stored[COMPARISON_CACHE_KEY]);
+  const newEntry: CachedComparisonEntry = {
+    key,
+    fetchedAt: Date.now(),
+    comparison,
+  };
+  const nextCache = [newEntry, ...cache.filter((item) => item.key !== key)].slice(
+    0,
+    MAX_SUMMARY_CACHE,
+  );
+  await browser.storage.local.set({ [COMPARISON_CACHE_KEY]: nextCache });
+}
+
+export function setCachedHospitalComparison(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonResult | null,
+): Promise<void> {
+  return enqueueWrite(() => setCachedHospitalComparisonUnlocked(name, regionHint, comparison));
+}
+
+export function attachComparisonToRecentHospital(
+  name: string,
+  regionHint: string,
+  comparison: HospitalComparisonResult,
+): Promise<readonly RecentHospitalRecord[]> {
+  return enqueueWrite(async () => {
+    const includeVat = await getVatIncluded();
+    return attachPreviewToRecentHospitalUnlocked(
+      name,
+      regionHint,
+      toPreviewFromComparison(comparison, includeVat),
+    );
+  });
 }

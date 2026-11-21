@@ -52,6 +52,8 @@ export const RawPlatformOfferSchema = z.object({
   badge: OfferBadgeSchema,
   bookingUrl: z.string().url(),
   updatedAt: z.string().min(1),
+  originalPrice: z.number().int().nonnegative().nullish(),
+  hasRange: z.boolean().nullish(),
 });
 export type RawPlatformOffer = z.infer<typeof RawPlatformOfferSchema>;
 
@@ -61,8 +63,43 @@ export const NormalizedPriceOfferSchema = RawPlatformOfferSchema.extend({
   effectivePriceVatIncluded: z.number().int().nonnegative(),
   effectivePriceVatExcluded: z.number().int().nonnegative(),
   hiraBaselinePrice: z.number().int().nonnegative().nullable(),
+  displayOriginalPrice: z.number().int().nonnegative().nullable(),
+  discountPercent: z.number().int().nonnegative(),
   savingsAmount: z.number().int(),
   savingsPercent: z.number().int(),
   isLowest: z.boolean(),
 });
 export type NormalizedPriceOffer = z.infer<typeof NormalizedPriceOfferSchema>;
+
+export const PlatformSummaryStatusSchema = z.enum(['matched', 'not_found', 'error']);
+export type PlatformSummaryStatus = z.infer<typeof PlatformSummaryStatusSchema>;
+
+export const PlatformSummaryItemSchema = z.object({
+  platform: PlatformSourceSchema,
+  platformLabel: z.string().min(1),
+  status: PlatformSummaryStatusSchema,
+  hospitalUrl: z.string().url().nullable(),
+  rating: z.number().nullable(),
+  ratingScale: z.union([z.literal(5), z.literal(10)]),
+  reviewCount: z.number().int().nonnegative(),
+  offerCount: z.number().int().nonnegative(),
+});
+export type PlatformSummaryItem = z.infer<typeof PlatformSummaryItemSchema>;
+
+export const TreatmentTagItemSchema = z.object({
+  name: z.string().min(1),
+  count: z.number().int().nonnegative(),
+});
+export type TreatmentTagItem = z.infer<typeof TreatmentTagItemSchema>;
+
+export const HospitalComparisonResultSchema = z.object({
+  hospitalName: z.string().min(1),
+  regionHint: z.string(),
+  department: z.string(),
+  matchedPlatforms: z.array(PlatformSummaryItemSchema),
+  rawOffers: z.array(RawPlatformOfferSchema),
+  hiraBaselines: z.record(z.string(), z.number().int().nonnegative()),
+  topTreatments: z.array(TreatmentTagItemSchema),
+  fetchedAt: z.number().int().nonnegative(),
+});
+export type HospitalComparisonResult = z.infer<typeof HospitalComparisonResultSchema>;

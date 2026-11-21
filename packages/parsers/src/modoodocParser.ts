@@ -1,4 +1,12 @@
-import { evaluateRegionCompatibility, formatPriceKRW, scoreNameMatch } from '@medi-bridge/shared';
+import {
+  classifyTreatmentName,
+  detectVatIncluded,
+  evaluateRegionCompatibility,
+  formatPriceKRW,
+  type RawPlatformOffer,
+  scoreNameMatch,
+  type TreatmentCategory,
+} from '@medi-bridge/shared';
 
 export interface ModoodocTreatmentTag {
   readonly name: string;
@@ -26,6 +34,8 @@ export interface ModoodocHospitalSummary {
   readonly topTreatments: readonly ModoodocTreatmentTag[];
   readonly topPrices: readonly ModoodocPriceItem[];
   readonly totalPriceCount: number;
+  readonly modoodocOffers?: readonly RawPlatformOffer[];
+  readonly hiraOffers?: readonly RawPlatformOffer[];
 }
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
@@ -109,7 +119,13 @@ function parseTreatments(
   return result.sort((a, b) => b.count - a.count).slice(0, 3);
 }
 
-function parsePriceItem(raw: Record<string, unknown>): ModoodocPriceItem | null {
+interface ParsedPriceCandidate {
+  readonly item: ModoodocPriceItem;
+  readonly originalNumericPrice: number | null;
+  readonly hasRange: boolean;
+}
+
+function parsePriceCandidate(raw: Record<string, unknown>): ParsedPriceCandidate | null {
   const groupObj = isRecordObject(raw.treatmentGroup) ? raw.treatmentGroup : null;
   const rawName = groupObj?.name ?? raw.name ?? raw.treatmentName;
   const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -152,6 +168,7 @@ function parsePriceItem(raw: Record<string, unknown>): ModoodocPriceItem | null 
   const displayPrice = hasRange && lowestPrice > 0 ? `${formattedPrice}~` : formattedPrice;
 
   let originalPrice: string | null = null;
+  let originalNumericPrice: number | null = null;
   let discountPercent: number | null = null;
   if (
     badge !== null &&
@@ -160,6 +177,7 @@ function parsePriceItem(raw: Record<string, unknown>): ModoodocPriceItem | null 
     raw.normalPrice.lowestPrice > lowestPrice
   ) {
     const normalLow = raw.normalPrice.lowestPrice;
+    originalNumericPrice = normalLow;
     originalPrice = formatPriceKRW(normalLow);
     if (lowestPrice > 0) {
       discountPercent = Math.round(((normalLow - lowestPrice) / normalLow) * 100);
@@ -167,35 +185,91 @@ function parsePriceItem(raw: Record<string, unknown>): ModoodocPriceItem | null 
   }
 
   return {
-    name,
-    displayPrice,
-    originalPrice,
-    discountPercent,
-    badge,
-    numericPrice: lowestPrice,
+    item: {
+      name,
+      displayPrice,
+      originalPrice,
+      discountPercent,
+      badge,
+      numericPrice: lowestPrice,
+    },
+    originalNumericPrice,
+    hasRange,
   };
+}
+
+function buildPlatformOffers(
+  candidates: readonly ParsedPriceCandidate[],
+  platform: 'modoodoc' | 'hira',
+  hospitalId: number,
+  detailUrl: string,
+  categoryHint?: TreatmentCategory,
+): RawPlatformOffer[] {
+  const offers: RawPlatformOffer[] = [];
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (!candidate || candidate.item.numericPrice <= 0) {
+      continue;
+    }
+    const standard = classifyTreatmentName(candidate.item.name, categoryHint);
+    offers.push({
+      id: `${platform}-${hospitalId}-${index}`,
+      platform,
+      treatmentCode: standard.code,
+      treatmentName: standard.label,
+      rawTitle: candidate.item.name,
+      listedPrice: Math.round(candidate.item.numericPrice),
+      vatIncluded: platform === 'hira' ? true : detectVatIncluded(candidate.item.name, true),
+      badge: platform === 'hira' ? '정가기준' : candidate.item.badge,
+      bookingUrl: detailUrl,
+      updatedAt: '실시간',
+      originalPrice:
+        candidate.originalNumericPrice !== null ? Math.round(candidate.originalNumericPrice) : null,
+      hasRange: candidate.hasRange,
+    });
+  }
+  return offers;
 }
 
 function parseAllPrices(
   treatmentPrices: readonly Record<string, unknown>[],
   hiraTreatmentPrices: readonly Record<string, unknown>[],
-): { topPrices: readonly ModoodocPriceItem[]; totalPriceCount: number } {
+  hospitalId: number,
+  detailUrl: string,
+  categoryHint?: TreatmentCategory,
+): {
+  topPrices: readonly ModoodocPriceItem[];
+  totalPriceCount: number;
+  modoodocOffers: readonly RawPlatformOffer[];
+  hiraOffers: readonly RawPlatformOffer[];
+} {
   const seenNames = new Set<string>();
+  const seenHiraNames = new Set<string>();
   const allItems: ModoodocPriceItem[] = [];
+  const modoodocCandidates: ParsedPriceCandidate[] = [];
+  const hiraCandidates: ParsedPriceCandidate[] = [];
 
   for (const raw of treatmentPrices) {
-    const item = parsePriceItem(raw);
-    if (item && !seenNames.has(item.name)) {
-      seenNames.add(item.name);
-      allItems.push(item);
+    const parsed = parsePriceCandidate(raw);
+    if (parsed && !seenNames.has(parsed.item.name)) {
+      seenNames.add(parsed.item.name);
+      allItems.push(parsed.item);
+      modoodocCandidates.push(parsed);
     }
   }
 
   for (const raw of hiraTreatmentPrices) {
-    const item = parsePriceItem(raw);
-    if (item && !seenNames.has(item.name)) {
-      seenNames.add(item.name);
-      allItems.push(item);
+    const parsed = parsePriceCandidate(raw);
+    if (!parsed) {
+      continue;
+    }
+    if (!seenHiraNames.has(parsed.item.name)) {
+      seenHiraNames.add(parsed.item.name);
+      hiraCandidates.push(parsed);
+    }
+    if (!seenNames.has(parsed.item.name)) {
+      seenNames.add(parsed.item.name);
+      allItems.push(parsed.item);
     }
   }
 
@@ -208,6 +282,14 @@ function parseAllPrices(
   return {
     topPrices: sorted.slice(0, 3),
     totalPriceCount: allItems.length,
+    modoodocOffers: buildPlatformOffers(
+      modoodocCandidates,
+      'modoodoc',
+      hospitalId,
+      detailUrl,
+      categoryHint,
+    ),
+    hiraOffers: buildPlatformOffers(hiraCandidates, 'hira', hospitalId, detailUrl, categoryHint),
   };
 }
 
@@ -223,6 +305,7 @@ export function parseModoodocSearchResult(
   html: string,
   targetName: string,
   targetRegionHint = '',
+  categoryHint?: TreatmentCategory,
 ): ModoodocSearchParseResult {
   if (!html || !targetName) {
     return { kind: 'parse_error' };
@@ -347,9 +430,12 @@ export function parseModoodocSearchResult(
     : `https://www.modoodoc.com/hospital/${best.id}`;
 
   const topTreatments = parseTreatments(best.treatments);
-  const { topPrices, totalPriceCount } = parseAllPrices(
+  const { topPrices, totalPriceCount, modoodocOffers, hiraOffers } = parseAllPrices(
     best.treatmentPrices,
     best.hiraTreatmentPrices,
+    best.id,
+    detailUrl,
+    categoryHint,
   );
 
   return {
@@ -364,6 +450,8 @@ export function parseModoodocSearchResult(
       topTreatments,
       topPrices,
       totalPriceCount,
+      modoodocOffers,
+      hiraOffers,
     },
   };
 }

@@ -41,7 +41,21 @@ export const STANDARD_TREATMENTS: readonly StandardTreatment[] = [
     category: '피부과',
     label: '울쎄라 리프팅',
     unitLabel: '300샷',
-    aliases: ['울쎄라', '슈링크', '써마지', '올리지오', '리프팅'],
+    aliases: ['울쎄라', '슈링크', '써마지', '올리지오', '리프테라', '덴서티', '리프팅'],
+  },
+  {
+    code: 'DERM_SKINBOOSTER',
+    category: '피부과',
+    label: '리쥬란 · 스킨부스터',
+    unitLabel: '1회',
+    aliases: ['리쥬란', '쥬베룩', '스킨부스터', '물광주사', '엑소좀'],
+  },
+  {
+    code: 'DERM_TONING',
+    category: '피부과',
+    label: '피코토닝 · 레이저',
+    unitLabel: '1회',
+    aliases: ['피코토닝', '레이저토닝', '피코플러스', '포텐자'],
   },
   {
     code: 'ORTHO_MANUAL',
@@ -62,7 +76,7 @@ export const STANDARD_TREATMENTS: readonly StandardTreatment[] = [
     category: '성형외과',
     label: '사각턱 보톡스',
     unitLabel: '50U',
-    aliases: ['보톡스', '사각턱', '스킨보톡스', '제오민', '필러'],
+    aliases: ['보톡스', '사각턱', '스킨보톡스', '제오민', '코어톡스', '필러'],
   },
 ];
 

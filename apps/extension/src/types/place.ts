@@ -4,8 +4,10 @@ import type {
   ModoodocPriceItem,
   ModoodocTreatmentTag,
 } from '@medi-bridge/parsers';
+import type { HospitalComparisonResult } from '@medi-bridge/shared';
 
 export type {
+  HospitalComparisonResult,
   ModoodocHospitalSummary,
   ModoodocPriceBadge,
   ModoodocPriceItem,
@@ -75,16 +77,22 @@ export interface CachedModoodocEntry {
   readonly summary: ModoodocHospitalSummary | null;
 }
 
-export interface FetchModoodocSummaryRequest {
-  readonly type: 'FETCH_MODOODOC_SUMMARY';
+export interface CachedComparisonEntry {
+  readonly key: string;
+  readonly fetchedAt: number;
+  readonly comparison: HospitalComparisonResult | null;
+}
+
+export interface FetchHospitalComparisonRequest {
+  readonly type: 'FETCH_HOSPITAL_COMPARISON';
   readonly hospitalName: string;
   readonly regionHint: string;
   readonly department: string;
 }
 
-export interface FetchModoodocSummaryResponse {
+export interface FetchHospitalComparisonResponse {
   readonly ok: boolean;
-  readonly summary: ModoodocHospitalSummary | null;
+  readonly comparison: HospitalComparisonResult | null;
 }
 
 export interface SearchRegionHintItem {
@@ -97,15 +105,15 @@ export interface RegisterSearchRegionHintsRequest {
   readonly items: readonly SearchRegionHintItem[];
 }
 
-export interface OpenModoodocHospitalRequest {
-  readonly type: 'OPEN_MODOODOC_HOSPITAL';
+export interface OpenPlatformTargetRequest {
+  readonly type: 'OPEN_PLATFORM_TARGET';
   readonly hospitalName: string;
   readonly regionHint: string;
   readonly department: string;
-  readonly targetUrl?: string | null;
+  readonly targetUrl: string;
 }
 
-export interface OpenModoodocHospitalResponse {
+export interface OpenPlatformTargetResponse {
   readonly ok: boolean;
   readonly targetUrl: string;
 }
@@ -124,6 +132,12 @@ export type HistoryMutation =
       readonly name: string;
       readonly regionHint: string;
       readonly summary: ModoodocHospitalSummary;
+    }
+  | {
+      readonly op: 'attach_comparison';
+      readonly name: string;
+      readonly regionHint: string;
+      readonly comparison: HospitalComparisonResult;
     };
 
 export interface MutateHistoryRequest {

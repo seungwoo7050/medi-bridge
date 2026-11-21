@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "id": 77620,
+      "hid": 4845,
+      "name": "리프테라2 리프팅 300샷",
+      "sub_category_name": "리프테라",
+      "price": 239000,
+      "discount_price": 120000,
+      "include_vat": true,
+      "is_hot": 1
+    },
+    {
+      "id": 77621,
+      "hid": 4845,
+      "name": "피코토닝 1회 (VAT별도)",
+      "sub_category_name": "피코토닝",
+      "price": 60000,
+      "discount_price": 32000,
+      "include_vat": false,
+      "is_hot": 0
+    }
+  ]
+}

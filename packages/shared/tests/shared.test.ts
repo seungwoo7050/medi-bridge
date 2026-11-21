@@ -7,6 +7,7 @@ import {
   evaluateMedicalCategory,
   formatPriceKRW,
   rankOffersByEffectivePrice,
+  resolveTargetPlatformsForDepartment,
   scoreClinicResolution,
   scoreNameMatch,
 } from '../src/index';
@@ -55,6 +56,43 @@ describe('VAT normalization and ranking', () => {
     });
     expect(vatExcludedRanked[0]?.platform).toBe('gangnamunni');
     expect(vatExcludedRanked[0]?.isLowest).toBe(true);
+  });
+
+  it('places zero-won checkup offers after positive-priced offers and computes discountPercent from originalPrice', () => {
+    const offers = [
+      {
+        id: 'offer-free',
+        platform: 'modoodoc' as const,
+        treatmentCode: 'DENT_SCALING',
+        treatmentName: '치아미백 · 스케일링',
+        rawTitle: '초진 무료 검진',
+        listedPrice: 0,
+        vatIncluded: true,
+        badge: null,
+        bookingUrl: 'https://www.modoodoc.com/hospital/1',
+        updatedAt: '실시간',
+      },
+      {
+        id: 'offer-paid',
+        platform: 'babitalk' as const,
+        treatmentCode: 'DERM_ULTHERA',
+        treatmentName: '울쎄라 리프팅',
+        rawTitle: '리프테라2 리프팅',
+        listedPrice: 120_000,
+        originalPrice: 240_000,
+        vatIncluded: true,
+        badge: '특가' as const,
+        bookingUrl: 'https://babitalk.com/events/1',
+        updatedAt: '실시간',
+      },
+    ];
+
+    const ranked = rankOffersByEffectivePrice(offers, true);
+    expect(ranked[0]?.id).toBe('offer-paid');
+    expect(ranked[0]?.displayOriginalPrice).toBe(240_000);
+    expect(ranked[0]?.discountPercent).toBe(50);
+    expect(ranked[1]?.id).toBe('offer-free');
+    expect(ranked[1]?.isLowest).toBe(false);
   });
 });
 
@@ -125,9 +163,34 @@ describe('clinic resolution & medical category filtering', () => {
 
     const dermLinks = buildExternalPlatformLinks('여름의원', '서울 서초구', '피부과');
     expect(dermLinks.map((l) => l.label)).toEqual(['강남언니', '여신티켓', '바비톡', '굿닥']);
+    expect(dermLinks.find((l) => l.platform === 'gangnamunni')?.url).toContain(
+      'https://unni.app/search?q=',
+    );
+    expect(dermLinks.find((l) => l.platform === 'yeoshin')?.url).toContain(
+      'https://www.yeoshin.co.kr/search/category?q=',
+    );
+    expect(dermLinks.find((l) => l.platform === 'babitalk')?.url).toContain(
+      'https://babitalk.com/search?keyword=',
+    );
+    expect(dermLinks.find((l) => l.platform === 'goodoc')?.url).toContain(
+      'https://www.goodoc.co.kr/hospitals?keyword=',
+    );
     const dentalLinks = buildExternalPlatformLinks('드라마치과병원', '경기 성남시', '치과');
     expect(dentalLinks.map((l) => l.label)).toEqual(['강남언니', '굿닥']);
     const orthoLinks = buildExternalPlatformLinks('서울정형외과', '서울 강남구', '정형외과');
     expect(orthoLinks.map((l) => l.label)).toEqual(['굿닥']);
+
+    expect(resolveTargetPlatformsForDepartment('피부과')).toEqual([
+      'modoodoc',
+      'gangnamunni',
+      'yeoshin',
+      'babitalk',
+    ]);
+    expect(resolveTargetPlatformsForDepartment('치과')).toEqual([
+      'modoodoc',
+      'gangnamunni',
+      'yeoshin',
+    ]);
+    expect(resolveTargetPlatformsForDepartment('정형외과')).toEqual(['modoodoc']);
   });
 });

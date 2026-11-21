@@ -3,15 +3,21 @@ import { BrandInfinityIcon } from '@medi-bridge/ui';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { getCachedHospitalSummary } from '../domain/bridgeStorage';
-import { attachSummaryViaWorker } from '../domain/historyGateway';
+import {
+  getCachedHospitalComparison,
+  getVatIncluded,
+  setVatIncluded,
+  subscribeVatIncluded,
+} from '../domain/bridgeStorage';
+import { attachComparisonViaWorker } from '../domain/historyGateway';
 import type {
-  FetchModoodocSummaryRequest,
-  FetchModoodocSummaryResponse,
-  ModoodocHospitalSummary,
-  OpenModoodocHospitalRequest,
-  OpenModoodocHospitalResponse,
+  FetchHospitalComparisonRequest,
+  FetchHospitalComparisonResponse,
+  HospitalComparisonResult,
+  OpenPlatformTargetRequest,
+  OpenPlatformTargetResponse,
 } from '../types/place';
+import { OfferComparisonSection } from './OfferComparisonSection';
 
 export interface MediBridgeEntryCardProps {
   readonly hospitalName: string;
@@ -28,31 +34,29 @@ export function MediBridgeEntryCard({
   isSubTab = false,
   onSelect,
 }: MediBridgeEntryCardProps): React.JSX.Element {
-  const [summary, setSummary] = useState<ModoodocHospitalSummary | null>(null);
+  const [comparison, setComparison] = useState<HospitalComparisonResult | null>(null);
+  const [includeVat, setIncludeVat] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
 
-  const effectiveRegion = summary?.address || regionHint;
-  const modoodocSearchUrl = buildModoodocSearchUrl(hospitalName, effectiveRegion);
-  const platformLinks = useMemo(
-    () => buildExternalPlatformLinks(hospitalName, effectiveRegion, department),
-    [hospitalName, effectiveRegion, department],
-  );
+  useEffect(() => {
+    void getVatIncluded().then(setIncludeVat);
+    return subscribeVatIncluded(setIncludeVat);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadSummary = async () => {
-      // /photo 등 주소 DOM이 없는 뷰에서는 로컬 미스 캐시를 건너뛰고 백그라운드 검색 지역 릴레이로 조회
+    const loadComparison = async () => {
       if (regionHint.trim().length > 0) {
-        const cached = await getCachedHospitalSummary(hospitalName, regionHint);
+        const cached = await getCachedHospitalComparison(hospitalName, regionHint);
         if (cancelled) {
           return;
         }
         if (cached.hit) {
-          setSummary(cached.summary);
+          setComparison(cached.comparison);
           setLoading(false);
-          if (cached.summary !== null) {
-            void attachSummaryViaWorker(hospitalName, regionHint, cached.summary);
+          if (cached.comparison !== null) {
+            void attachComparisonViaWorker(hospitalName, regionHint, cached.comparison);
           }
           return;
         }
@@ -60,33 +64,63 @@ export function MediBridgeEntryCard({
 
       setLoading(true);
       try {
-        const req: FetchModoodocSummaryRequest = {
-          type: 'FETCH_MODOODOC_SUMMARY',
+        const req: FetchHospitalComparisonRequest = {
+          type: 'FETCH_HOSPITAL_COMPARISON',
           hospitalName,
           regionHint,
           department,
         };
         const res = (await browser.runtime.sendMessage(req)) as
-          | FetchModoodocSummaryResponse
+          | FetchHospitalComparisonResponse
           | undefined;
 
         if (!cancelled) {
-          setSummary(res?.ok ? (res.summary ?? null) : null);
+          setComparison(res?.ok ? (res.comparison ?? null) : null);
           setLoading(false);
         }
       } catch {
         if (!cancelled) {
-          setSummary(null);
+          setComparison(null);
           setLoading(false);
         }
       }
     };
 
-    void loadSummary();
+    void loadComparison();
     return () => {
       cancelled = true;
     };
   }, [hospitalName, regionHint, department]);
+
+  const effectiveRegion = comparison?.regionHint || regionHint;
+  const modoodocSearchUrl = buildModoodocSearchUrl(hospitalName, effectiveRegion);
+
+  const matchedPlatforms = useMemo(
+    () =>
+      (comparison?.matchedPlatforms ?? []).filter(
+        (item) => item.status === 'matched' && item.platform !== 'hira',
+      ),
+    [comparison?.matchedPlatforms],
+  );
+
+  const fallbackSearchLinks = useMemo(() => {
+    const extLinks = buildExternalPlatformLinks(hospitalName, effectiveRegion, department);
+    const matchedSet = new Set(matchedPlatforms.map((p) => p.platform));
+    const remaining = extLinks.filter((link) => !matchedSet.has(link.platform));
+    if (!matchedSet.has('modoodoc')) {
+      return [
+        { platform: 'modoodoc' as const, label: '모두닥 검색', url: modoodocSearchUrl },
+        ...remaining,
+      ];
+    }
+    return remaining;
+  }, [matchedPlatforms, hospitalName, effectiveRegion, department, modoodocSearchUrl]);
+
+  const handleToggleVat = () => {
+    const next = !includeVat;
+    setIncludeVat(next);
+    void setVatIncluded(next);
+  };
 
   const handleOpenTarget = (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -99,8 +133,8 @@ export function MediBridgeEntryCard({
       return;
     }
     event.preventDefault();
-    const req: OpenModoodocHospitalRequest = {
-      type: 'OPEN_MODOODOC_HOSPITAL',
+    const req: OpenPlatformTargetRequest = {
+      type: 'OPEN_PLATFORM_TARGET',
       hospitalName,
       regionHint: effectiveRegion,
       department,
@@ -109,7 +143,7 @@ export function MediBridgeEntryCard({
     void browser.runtime
       .sendMessage(req)
       .then((res) => {
-        const parsed = res as OpenModoodocHospitalResponse | undefined;
+        const parsed = res as OpenPlatformTargetResponse | undefined;
         if (!parsed?.ok) {
           onSelect?.();
           window.open(explicitUrl, '_blank', 'noopener,noreferrer');
@@ -126,59 +160,74 @@ export function MediBridgeEntryCard({
   if (loading) {
     return (
       <div className={wrapperClassName}>
-        <a
-          href={modoodocSearchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mb-slim-badge is-loading"
-          onClick={(e) => handleOpenTarget(e, modoodocSearchUrl)}
-        >
+        <div className="mb-slim-badge is-loading" role="status" aria-live="polite">
           <BrandInfinityIcon size={16} />
-          <span>메디 브릿지 · 모두닥 가격·리뷰 확인 중...</span>
-          <span aria-hidden="true">↗</span>
-        </a>
+          <span>메디 브릿지 · 플랫폼별 가격 수집 및 최저가 정렬 중...</span>
+        </div>
       </div>
     );
   }
 
-  if (summary !== null) {
-    const treatments = summary.topTreatments.slice(0, 3);
-    const prices = summary.topPrices.slice(0, 4);
-    const extraPriceCount = summary.totalPriceCount - prices.length;
-
+  if (comparison !== null) {
     return (
       <div className={wrapperClassName}>
         <section
           className="mb-bento-card"
-          aria-label={`${summary.name} 모두닥 인증 리뷰 및 비급여 가격`}
+          aria-label={`${comparison.hospitalName} 플랫폼별 최저가 비교`}
         >
           <div className="mb-card-header">
             <div className="mb-brand-group">
               <span className="mb-logo-pill" aria-hidden="true">
                 <BrandInfinityIcon size={15} />
               </span>
-              <span className="mb-brand-title">메디 브릿지 · 모두닥</span>
-              {summary.totalScore !== null && (
-                <span className="mb-rating">★ {summary.totalScore.toFixed(1)}</span>
-              )}
-              <span className="mb-reviews">
-                인증리뷰 {summary.reviewCount.toLocaleString('ko-KR')}건
-              </span>
+              <span className="mb-brand-title">메디 브릿지 · 최저가 비교</span>
             </div>
-            <a
-              href={summary.detailUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-primary-cta"
-              onClick={(e) => handleOpenTarget(e, summary.detailUrl)}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={includeVat}
+              className={`mb-vat-toggle${includeVat ? ' is-on' : ''}`}
+              onClick={handleToggleVat}
             >
-              리뷰 보기 ↗
-            </a>
+              {includeVat ? '부가세 포함가' : '플랫폼 표기가'}
+            </button>
           </div>
 
-          {treatments.length > 0 && (
+          {matchedPlatforms.length > 0 && (
+            <div className="mb-matched-platforms">
+              {matchedPlatforms.map((item) =>
+                item.hospitalUrl ? (
+                  <a
+                    key={item.platform}
+                    href={item.hospitalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-platform-summary-link"
+                    onClick={(e) => handleOpenTarget(e, item.hospitalUrl ?? '')}
+                  >
+                    <span>{item.platformLabel}</span>
+                    {item.rating !== null && (
+                      <span className="mb-rating">★ {item.rating.toFixed(1)}</span>
+                    )}
+                    {item.reviewCount > 0 && (
+                      <span className="mb-reviews">
+                        ({item.reviewCount.toLocaleString('ko-KR')})
+                      </span>
+                    )}
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <span key={item.platform} className="mb-platform-summary-link">
+                    {item.platformLabel}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+
+          {comparison.topTreatments.length > 0 && (
             <div className="mb-tags-row">
-              {treatments.map((tag) => (
+              {comparison.topTreatments.slice(0, 3).map((tag) => (
                 <span key={tag.name} className="mb-tag-chip">
                   #{tag.name} {tag.count.toLocaleString('ko-KR')}
                 </span>
@@ -186,56 +235,32 @@ export function MediBridgeEntryCard({
             </div>
           )}
 
-          {prices.length > 0 && (
-            <div className="mb-offers-list">
-              {prices.map((price) => (
-                <div key={price.name} className="mb-offer-row">
-                  <div className="mb-price-left">
-                    {price.badge !== null && <span className="mb-price-badge">{price.badge}</span>}
-                    <span className="mb-ssr-name">{price.name}</span>
-                  </div>
-                  <div className="mb-offer-right">
-                    {price.discountPercent !== null && price.discountPercent > 0 && (
-                      <span className="mb-savings-pill">-{price.discountPercent}%</span>
-                    )}
-                    {price.originalPrice !== null && (
-                      <span className="mb-hira-price">{price.originalPrice}</span>
-                    )}
-                    <span className="mb-offer-price">{price.displayPrice}</span>
-                  </div>
-                </div>
-              ))}
-              {extraPriceCount > 0 && (
-                <a
-                  href={summary.detailUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mb-more-link"
-                  onClick={(e) => handleOpenTarget(e, summary.detailUrl)}
-                >
-                  + 외 {extraPriceCount}개 시술 가격 보기 ↗
-                </a>
-              )}
+          <OfferComparisonSection
+            comparison={comparison}
+            includeVat={includeVat}
+            maxVisible={5}
+            onOpenTarget={handleOpenTarget}
+          />
+
+          {fallbackSearchLinks.length > 0 && (
+            <div className="mb-ext-links-row">
+              <span className="mb-ext-links-label">추가 플랫폼 검색</span>
+              <div className="mb-ext-links-group">
+                {fallbackSearchLinks.map((link) => (
+                  <a
+                    key={link.platform}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-ext-chip"
+                    onClick={(e) => handleOpenTarget(e, link.url)}
+                  >
+                    {link.label} ↗
+                  </a>
+                ))}
+              </div>
             </div>
           )}
-
-          <div className="mb-ext-links-row">
-            <span className="mb-ext-links-label">다른 플랫폼 검색</span>
-            <div className="mb-ext-links-group">
-              {platformLinks.map((link) => (
-                <a
-                  key={link.platform}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mb-ext-chip"
-                  onClick={(e) => handleOpenTarget(e, link.url)}
-                >
-                  {link.label} ↗
-                </a>
-              ))}
-            </div>
-          </div>
         </section>
       </div>
     );
@@ -250,21 +275,12 @@ export function MediBridgeEntryCard({
               <BrandInfinityIcon size={14} />
             </span>
             <span className="mb-brand-title">메디 브릿지</span>
-            <span className="mb-fallback-note">모두닥 직접 매칭 없음</span>
+            <span className="mb-fallback-note">직접 수집된 가격표 없음</span>
           </div>
-          <a
-            href={modoodocSearchUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mb-fallback-modoodoc"
-            onClick={(e) => handleOpenTarget(e, modoodocSearchUrl)}
-          >
-            모두닥 검색 ↗
-          </a>
         </div>
         <div className="mb-ext-links-row">
           <div className="mb-ext-links-group">
-            {platformLinks.map((link) => (
+            {fallbackSearchLinks.map((link) => (
               <a
                 key={link.platform}
                 href={link.url}

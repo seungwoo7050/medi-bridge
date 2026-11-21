@@ -8,6 +8,7 @@ import {
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { extractHospitalFromEntryDocument } from '../../adapters/naverEntryDom';
 import { extractHospitalsFromSearchList } from '../../adapters/naverSearchListDom';
+import { MediBridgeCompareDrawer } from '../../components/MediBridgeCompareDrawer';
 import { MediBridgeEntryCard } from '../../components/MediBridgeEntryCard';
 import { MediBridgeListChip } from '../../components/MediBridgeListChip';
 import {
@@ -29,6 +30,7 @@ import './style.css';
 
 const ENTRY_SHADOW_HOST_NAME = 'medi-bridge-entry-card';
 const LIST_SHADOW_HOST_NAME = 'medi-bridge-list-chip';
+const DRAWER_SHADOW_HOST_NAME = 'medi-bridge-compare-drawer';
 const DEBOUNCE_MS = 120;
 
 interface MountedListChip {
@@ -36,6 +38,13 @@ interface MountedListChip {
   readonly item: ExtractedSearchListHospital;
   readonly root: ReactDOM.Root;
   readonly ui: ShadowRootContentScriptUi<ReactDOM.Root>;
+}
+
+interface CompareDrawerTarget {
+  readonly key: string;
+  readonly name: string;
+  readonly regionHint: string;
+  readonly department: string;
 }
 
 export default defineContentScript({
@@ -48,6 +57,9 @@ export default defineContentScript({
     let currentEntrySignature: string | null = null;
     let lastRecordedSignature: string | null = null;
     let activeEntryUi: ShadowRootContentScriptUi<ReactDOM.Root> | null = null;
+    let activeDrawerUi: ShadowRootContentScriptUi<ReactDOM.Root> | null = null;
+    let activeDrawerRoot: ReactDOM.Root | null = null;
+    let activeCompareTarget: CompareDrawerTarget | null = null;
     let isSyncing = false;
     let pendingResync = false;
     let debounceTimer: number | null = null;
@@ -62,27 +74,115 @@ export default defineContentScript({
       }
     };
 
+    const cleanupCompareDrawer = () => {
+      if (activeDrawerUi) {
+        activeDrawerUi.remove();
+        activeDrawerUi = null;
+      }
+      activeDrawerRoot = null;
+      activeCompareTarget = null;
+    };
+
+    const renderDrawerContent = (root: ReactDOM.Root, target: CompareDrawerTarget) => {
+      root.render(
+        <MediBridgeCompareDrawer
+          key={target.key}
+          hospitalName={target.name}
+          regionHint={target.regionHint}
+          department={target.department}
+          onClose={() => {
+            cleanupCompareDrawer();
+            rerenderAllMountedListChips();
+          }}
+          onOfferOpen={() => {
+            void markHospitalClickedViaWorker({
+              name: target.name,
+              department: target.department,
+              regionHint: target.regionHint,
+            });
+          }}
+        />,
+      );
+    };
+
+    const openCompareDrawer = async (item: ExtractedSearchListHospital) => {
+      if (ctx.isInvalid || !bridgeEnabled || !document.body) {
+        return;
+      }
+
+      const nextTarget: CompareDrawerTarget = {
+        key: item.itemKey,
+        name: item.name,
+        regionHint: item.regionHint,
+        department: item.matchedDepartment,
+      };
+      activeCompareTarget = nextTarget;
+      rerenderAllMountedListChips();
+
+      void recordHospitalViewViaWorker({
+        name: item.name,
+        department: item.matchedDepartment,
+        regionHint: item.regionHint,
+      });
+
+      if (activeDrawerUi && activeDrawerRoot && document.querySelector(DRAWER_SHADOW_HOST_NAME)) {
+        renderDrawerContent(activeDrawerRoot, nextTarget);
+        return;
+      }
+
+      if (activeDrawerUi) {
+        activeDrawerUi.remove();
+        activeDrawerUi = null;
+        activeDrawerRoot = null;
+      }
+
+      const ui = await createShadowRootUi(ctx, {
+        name: DRAWER_SHADOW_HOST_NAME,
+        position: 'inline',
+        anchor: document.body,
+        append: 'last',
+        isolateEvents: ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'wheel'],
+        onMount: (container) => {
+          const mountNode = document.createElement('div');
+          container.append(mountNode);
+          const root = ReactDOM.createRoot(mountNode);
+          activeDrawerRoot = root;
+          if (activeCompareTarget) {
+            renderDrawerContent(root, activeCompareTarget);
+          }
+          return root;
+        },
+        onRemove: (root) => {
+          root?.unmount();
+        },
+      });
+
+      if (ctx.isInvalid || !bridgeEnabled || !activeCompareTarget) {
+        ui.remove();
+        return;
+      }
+
+      ui.mount();
+      activeDrawerUi = ui;
+    };
+
     const renderChipIntoRoot = (root: ReactDOM.Root, item: ExtractedSearchListHospital) => {
       const hospitalKey = buildHospitalKey(item.name, item.regionHint);
       const historyRecord = recentHospitalsMap.get(hospitalKey);
       const isVisited = historyRecord?.clickedModoodoc === true;
-      const detailUrl = historyRecord?.summary?.detailUrl ?? null;
       const lowestLabel = historyRecord?.summary?.representativePrice ?? null;
+      const platformLabel = historyRecord?.summary?.platformLabel ?? null;
+      const isActive = activeCompareTarget?.key === item.itemKey;
 
       root.render(
         <MediBridgeListChip
           hospitalName={item.name}
-          regionHint={item.regionHint}
-          department={item.matchedDepartment}
           isVisited={isVisited}
-          detailUrl={detailUrl}
+          isActive={isActive}
           lowestLabel={lowestLabel}
-          onSelect={() => {
-            void markHospitalClickedViaWorker({
-              name: item.name,
-              department: item.matchedDepartment,
-              regionHint: item.regionHint,
-            });
+          platformLabel={platformLabel}
+          onCompareClick={() => {
+            void openCompareDrawer(item);
           }}
         />,
       );
@@ -193,6 +293,7 @@ export default defineContentScript({
       const listHospitals = extractHospitalsFromSearchList(document);
       if (listHospitals.length === 0) {
         cleanupAllListChips();
+        cleanupCompareDrawer();
         return;
       }
 
@@ -287,6 +388,7 @@ export default defineContentScript({
         if (!bridgeEnabled) {
           cleanupEntryUi();
           cleanupAllListChips();
+          cleanupCompareDrawer();
           return;
         }
         await syncEntryBadge();
@@ -325,6 +427,7 @@ export default defineContentScript({
       if (!enabled) {
         cleanupEntryUi();
         cleanupAllListChips();
+        cleanupCompareDrawer();
       } else {
         scheduleSync();
       }
@@ -355,6 +458,7 @@ export default defineContentScript({
       }
       cleanupEntryUi();
       cleanupAllListChips();
+      cleanupCompareDrawer();
     });
   },
 });

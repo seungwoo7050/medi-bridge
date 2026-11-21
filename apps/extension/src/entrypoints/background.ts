@@ -1,13 +1,31 @@
-import { normalizeCompareName } from '@medi-bridge/shared';
+import {
+  parseBabitalkHospitalEvents,
+  parseBabitalkHospitalSearch,
+  parseGangnamunniHospitalDetail,
+  parseGangnamunniSearchCandidates,
+  parseModoodocSearchResult,
+  parseYeoshinHospitalSearch,
+  parseYeoshinSalesEvents,
+} from '@medi-bridge/parsers';
+import {
+  type CollectablePlatformSource,
+  type HospitalComparisonResult,
+  normalizeCompareName,
+  normalizeDepartmentCategory,
+  PLATFORM_LABELS,
+  type PlatformSummaryItem,
+  type RawPlatformOffer,
+  resolveTargetPlatformsForDepartment,
+  type TreatmentCategory,
+} from '@medi-bridge/shared';
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
-import { parseModoodocSearchResult } from '../adapters/modoodocSearchParser';
 import {
-  attachSummaryToRecentHospital,
+  attachComparisonToRecentHospital,
   getBridgeState,
-  getCachedHospitalSummary,
+  getCachedHospitalComparison,
   markHospitalClicked,
-  setCachedHospitalSummary,
+  setCachedHospitalComparison,
   subscribeBridgeEnabled,
 } from '../domain/bridgeStorage';
 import { applyHistoryMutation } from '../domain/historyGateway';
@@ -18,16 +36,18 @@ import {
   normalizeHospitalName,
 } from '../domain/modoodocUrl';
 import type {
-  FetchModoodocSummaryRequest,
-  FetchModoodocSummaryResponse,
+  FetchHospitalComparisonRequest,
+  FetchHospitalComparisonResponse,
   HistoryMutation,
   MutateHistoryRequest,
-  OpenModoodocHospitalRequest,
-  OpenModoodocHospitalResponse,
+  OpenPlatformTargetRequest,
+  OpenPlatformTargetResponse,
   RegisterSearchRegionHintsRequest,
 } from '../types/place';
 
 const MAX_SEARCH_REGION_HINTS = 300;
+const PLATFORM_TIMEOUT_MS = 5000;
+
 const ACTIVE_ICON_PATHS = {
   16: 'icon/active-16.png',
   32: 'icon/active-32.png',
@@ -56,10 +76,10 @@ function isRecordObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isFetchModoodocSummaryRequest(value: unknown): value is FetchModoodocSummaryRequest {
+function isFetchHospitalComparisonRequest(value: unknown): value is FetchHospitalComparisonRequest {
   return (
     isRecordObject(value) &&
-    value.type === 'FETCH_MODOODOC_SUMMARY' &&
+    value.type === 'FETCH_HOSPITAL_COMPARISON' &&
     typeof value.hospitalName === 'string' &&
     typeof value.regionHint === 'string' &&
     typeof value.department === 'string'
@@ -76,13 +96,15 @@ function isRegisterSearchRegionHintsRequest(
   );
 }
 
-function isOpenModoodocHospitalRequest(value: unknown): value is OpenModoodocHospitalRequest {
+function isOpenPlatformTargetRequest(value: unknown): value is OpenPlatformTargetRequest {
   return (
     isRecordObject(value) &&
-    value.type === 'OPEN_MODOODOC_HOSPITAL' &&
+    value.type === 'OPEN_PLATFORM_TARGET' &&
     typeof value.hospitalName === 'string' &&
     typeof value.regionHint === 'string' &&
-    typeof value.department === 'string'
+    typeof value.department === 'string' &&
+    typeof value.targetUrl === 'string' &&
+    value.targetUrl.startsWith('https://')
   );
 }
 
@@ -108,6 +130,12 @@ function isHistoryMutation(value: unknown): value is HistoryMutation {
         typeof value.regionHint === 'string' &&
         isRecordObject(value.summary)
       );
+    case 'attach_comparison':
+      return (
+        typeof value.name === 'string' &&
+        typeof value.regionHint === 'string' &&
+        isRecordObject(value.comparison)
+      );
     default:
       return false;
   }
@@ -119,7 +147,7 @@ function isMutateHistoryRequest(value: unknown): value is MutateHistoryRequest {
   );
 }
 
-const inFlightSsr = new Map<string, Promise<FetchModoodocSummaryResponse>>();
+const inFlightComparison = new Map<string, Promise<FetchHospitalComparisonResponse>>();
 const searchRegionHints = new Map<string, string>();
 
 function registerSearchRegionHints(items: readonly unknown[]): void {
@@ -148,99 +176,429 @@ function resolveEffectiveRegion(hospitalName: string, regionHint: string): strin
   return searchRegionHints.get(key) ?? '';
 }
 
-async function fetchModoodocSsrSummary(
+interface PlatformCollectResult {
+  readonly summary: PlatformSummaryItem;
+  readonly offers: readonly RawPlatformOffer[];
+  readonly hiraOffers?: readonly RawPlatformOffer[];
+  readonly topTreatments?: readonly { readonly name: string; readonly count: number }[];
+}
+
+function buildFailedSummary(
+  platform: CollectablePlatformSource,
+  status: 'not_found' | 'error',
+): PlatformCollectResult {
+  return {
+    summary: {
+      platform,
+      platformLabel: PLATFORM_LABELS[platform],
+      status,
+      hospitalUrl: null,
+      rating: null,
+      ratingScale: platform === 'babitalk' ? 5 : 10,
+      reviewCount: 0,
+      offerCount: 0,
+    },
+    offers: [],
+  };
+}
+
+async function fetchTextWithTimeout(url: string, accept: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(PLATFORM_TIMEOUT_MS),
+      headers: { Accept: accept },
+    });
+    if (!res.ok) {
+      return null;
+    }
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchJsonWithTimeout(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(PLATFORM_TIMEOUT_MS),
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function collectModoodoc(
+  hospitalName: string,
+  effectiveRegion: string,
+  categoryHint: TreatmentCategory,
+): Promise<PlatformCollectResult> {
+  const searchUrl = buildModoodocSearchUrl(hospitalName, effectiveRegion);
+  const html = await fetchTextWithTimeout(searchUrl, 'text/html');
+  if (html === null) {
+    return buildFailedSummary('modoodoc', 'error');
+  }
+
+  const parsed = parseModoodocSearchResult(html, hospitalName, effectiveRegion, categoryHint);
+  if (parsed.kind === 'parse_error') {
+    return buildFailedSummary('modoodoc', 'error');
+  }
+  if (parsed.kind === 'not_found') {
+    return buildFailedSummary('modoodoc', 'not_found');
+  }
+
+  const modoodocOffers = parsed.summary.modoodocOffers ?? [];
+  const hiraOffers = parsed.summary.hiraOffers ?? [];
+
+  return {
+    summary: {
+      platform: 'modoodoc',
+      platformLabel: PLATFORM_LABELS.modoodoc,
+      status: 'matched',
+      hospitalUrl: parsed.summary.detailUrl,
+      rating: parsed.summary.totalScore,
+      ratingScale: 10,
+      reviewCount: parsed.summary.reviewCount,
+      offerCount: modoodocOffers.length,
+    },
+    offers: modoodocOffers,
+    hiraOffers,
+    topTreatments: parsed.summary.topTreatments,
+  };
+}
+
+async function collectGangnamunni(
+  hospitalName: string,
+  effectiveRegion: string,
+  categoryHint: TreatmentCategory,
+): Promise<PlatformCollectResult> {
+  const cleanName = normalizeHospitalName(hospitalName);
+  const searchUrl = `https://unni.app/search?q=${encodeURIComponent(cleanName)}`;
+  const searchHtml = await fetchTextWithTimeout(searchUrl, 'text/html');
+  if (searchHtml === null) {
+    return buildFailedSummary('gangnamunni', 'error');
+  }
+
+  const candidatesRes = parseGangnamunniSearchCandidates(searchHtml, hospitalName, effectiveRegion);
+  if (candidatesRes.kind === 'parse_error') {
+    return buildFailedSummary('gangnamunni', 'error');
+  }
+  if (candidatesRes.kind === 'not_found') {
+    return buildFailedSummary('gangnamunni', 'not_found');
+  }
+
+  let sawError = false;
+  for (const candidate of candidatesRes.candidates) {
+    const detailHtml = await fetchTextWithTimeout(
+      `https://unni.app/hospitals/${candidate.id}`,
+      'text/html',
+    );
+    if (detailHtml === null) {
+      sawError = true;
+      continue;
+    }
+
+    const detailRes = parseGangnamunniHospitalDetail(
+      detailHtml,
+      hospitalName,
+      effectiveRegion,
+      categoryHint,
+    );
+    if (detailRes.kind === 'parse_error') {
+      sawError = true;
+      continue;
+    }
+    if (detailRes.kind === 'found') {
+      const { summary } = detailRes;
+      return {
+        summary: {
+          platform: 'gangnamunni',
+          platformLabel: PLATFORM_LABELS.gangnamunni,
+          status: 'matched',
+          hospitalUrl: summary.detailUrl,
+          rating: summary.rating,
+          ratingScale: 10,
+          reviewCount: summary.reviewCount,
+          offerCount: summary.offers.length,
+        },
+        offers: summary.offers,
+      };
+    }
+  }
+
+  return buildFailedSummary('gangnamunni', sawError ? 'error' : 'not_found');
+}
+
+async function collectYeoshin(
+  hospitalName: string,
+  effectiveRegion: string,
+  categoryHint: TreatmentCategory,
+): Promise<PlatformCollectResult> {
+  const cleanName = normalizeHospitalName(hospitalName);
+  let searchJson: unknown;
+  try {
+    searchJson = await fetchJsonWithTimeout(
+      `https://api.yeoshin.co.kr/hospitals/search?query=${encodeURIComponent(cleanName)}`,
+    );
+  } catch {
+    return buildFailedSummary('yeoshin', 'error');
+  }
+
+  const hospRes = parseYeoshinHospitalSearch(searchJson, hospitalName, effectiveRegion);
+  if (hospRes.kind === 'parse_error') {
+    return buildFailedSummary('yeoshin', 'error');
+  }
+  if (hospRes.kind === 'not_found') {
+    return buildFailedSummary('yeoshin', 'not_found');
+  }
+
+  let eventsJson: unknown;
+  try {
+    eventsJson = await fetchJsonWithTimeout(
+      `https://api.yeoshin.co.kr/hospitals/${hospRes.hospital.hospitalId}/sales-events`,
+    );
+  } catch {
+    return buildFailedSummary('yeoshin', 'error');
+  }
+
+  const eventsRes = parseYeoshinSalesEvents(eventsJson, hospRes.hospital.hospitalId, categoryHint);
+  if (eventsRes.kind === 'parse_error') {
+    return buildFailedSummary('yeoshin', 'error');
+  }
+
+  const offers = eventsRes.kind === 'found' ? eventsRes.offers : [];
+  return {
+    summary: {
+      platform: 'yeoshin',
+      platformLabel: PLATFORM_LABELS.yeoshin,
+      status: 'matched',
+      hospitalUrl: hospRes.hospital.detailUrl,
+      rating: hospRes.hospital.rating,
+      ratingScale: 10,
+      reviewCount: hospRes.hospital.reviewCount,
+      offerCount: offers.length,
+    },
+    offers,
+  };
+}
+
+async function collectBabitalk(
+  hospitalName: string,
+  effectiveRegion: string,
+  categoryHint: TreatmentCategory,
+): Promise<PlatformCollectResult> {
+  const cleanName = normalizeHospitalName(hospitalName);
+  let searchJson: unknown;
+  try {
+    searchJson = await fetchJsonWithTimeout(
+      `https://web-api.babitalk.com/v2/search/hospitals?query=${encodeURIComponent(cleanName)}`,
+    );
+  } catch {
+    return buildFailedSummary('babitalk', 'error');
+  }
+
+  const hospRes = parseBabitalkHospitalSearch(searchJson, hospitalName, effectiveRegion);
+  if (hospRes.kind === 'parse_error') {
+    return buildFailedSummary('babitalk', 'error');
+  }
+  if (hospRes.kind === 'not_found') {
+    return buildFailedSummary('babitalk', 'not_found');
+  }
+
+  let eventsJson: unknown;
+  try {
+    eventsJson = await fetchJsonWithTimeout(
+      `https://web-api.babitalk.com/v2/hospitals/${hospRes.hospital.hospitalId}/events`,
+    );
+  } catch {
+    return buildFailedSummary('babitalk', 'error');
+  }
+
+  const eventsRes = parseBabitalkHospitalEvents(
+    eventsJson,
+    hospRes.hospital.hospitalId,
+    categoryHint,
+  );
+  if (eventsRes.kind === 'parse_error') {
+    return buildFailedSummary('babitalk', 'error');
+  }
+
+  const offers = eventsRes.kind === 'found' ? eventsRes.offers : [];
+  return {
+    summary: {
+      platform: 'babitalk',
+      platformLabel: PLATFORM_LABELS.babitalk,
+      status: 'matched',
+      hospitalUrl: hospRes.hospital.detailUrl,
+      rating: hospRes.hospital.rating,
+      ratingScale: 5,
+      reviewCount: hospRes.hospital.reviewCount,
+      offerCount: offers.length,
+    },
+    offers,
+  };
+}
+
+function runCollector(
+  platform: CollectablePlatformSource,
+  hospitalName: string,
+  effectiveRegion: string,
+  categoryHint: TreatmentCategory,
+): Promise<PlatformCollectResult> {
+  switch (platform) {
+    case 'modoodoc':
+      return collectModoodoc(hospitalName, effectiveRegion, categoryHint);
+    case 'gangnamunni':
+      return collectGangnamunni(hospitalName, effectiveRegion, categoryHint);
+    case 'yeoshin':
+      return collectYeoshin(hospitalName, effectiveRegion, categoryHint);
+    case 'babitalk':
+      return collectBabitalk(hospitalName, effectiveRegion, categoryHint);
+  }
+}
+
+async function fetchHospitalMultiPlatformComparison(
   hospitalName: string,
   regionHint: string,
-): Promise<FetchModoodocSummaryResponse> {
+  department: string,
+): Promise<FetchHospitalComparisonResponse> {
   const cleanName = normalizeHospitalName(hospitalName);
   const directRegion = extractRegionHintFromAddress(regionHint);
   const effectiveRegion = resolveEffectiveRegion(hospitalName, regionHint);
   const hasEffectiveRegion = effectiveRegion.length > 0;
-  const key = buildHospitalKey(cleanName, effectiveRegion);
+  const categoryHint = normalizeDepartmentCategory(department);
+  const key = `${buildHospitalKey(cleanName, effectiveRegion)}::${categoryHint}`;
 
-  const cached = await getCachedHospitalSummary(hospitalName, effectiveRegion);
-  // 지역 힌트가 비어 있을 때 과거 부정 캐시로 조기 종료하지 않음
-  if (cached.hit && (cached.summary !== null || hasEffectiveRegion)) {
-    if (cached.summary !== null) {
-      await attachSummaryToRecentHospital(hospitalName, effectiveRegion, cached.summary);
+  const cached = await getCachedHospitalComparison(hospitalName, effectiveRegion);
+  if (cached.hit && (cached.comparison !== null || hasEffectiveRegion)) {
+    if (cached.comparison !== null) {
+      await attachComparisonToRecentHospital(hospitalName, effectiveRegion, cached.comparison);
       if (directRegion !== effectiveRegion) {
-        await attachSummaryToRecentHospital(hospitalName, directRegion, cached.summary);
+        await attachComparisonToRecentHospital(hospitalName, directRegion, cached.comparison);
       }
     }
-    return { ok: true, summary: cached.summary };
+    return { ok: true, comparison: cached.comparison };
   }
 
-  const running = inFlightSsr.get(key);
+  const running = inFlightComparison.get(key);
   if (running) {
     return running;
   }
 
-  const task = (async (): Promise<FetchModoodocSummaryResponse> => {
+  const task = (async (): Promise<FetchHospitalComparisonResponse> => {
     try {
-      const searchUrl = buildModoodocSearchUrl(hospitalName, effectiveRegion);
-      const res = await fetch(searchUrl, {
-        signal: AbortSignal.timeout(5000),
-        headers: { Accept: 'text/html' },
-      });
+      const targetPlatforms = resolveTargetPlatformsForDepartment(department);
+      const settled = await Promise.allSettled(
+        targetPlatforms.map((platform) =>
+          runCollector(platform, hospitalName, effectiveRegion, categoryHint),
+        ),
+      );
 
-      if (!res.ok) {
-        return { ok: false, summary: null };
-      }
+      const matchedPlatforms: PlatformSummaryItem[] = [];
+      const rawOffers: RawPlatformOffer[] = [];
+      const hiraOffers: RawPlatformOffer[] = [];
+      const hiraBaselines: Record<string, number> = {};
+      let topTreatments: { name: string; count: number }[] = [];
+      let modoodocHospitalUrl: string | null = null;
 
-      const html = await res.text();
-      const parsed = parseModoodocSearchResult(html, hospitalName, effectiveRegion);
-      if (parsed.kind === 'parse_error') {
-        // 구조 오류는 미등록으로 캐시하지 않아 부정 캐시 오염을 차단한다.
-        return { ok: false, summary: null };
-      }
+      for (let idx = 0; idx < targetPlatforms.length; idx += 1) {
+        const platform = targetPlatforms[idx];
+        const outcome = settled[idx];
+        if (!platform || !outcome) continue;
 
-      if (parsed.kind === 'not_found') {
-        // 지역 누락 상태의 not_found는 부정 캐시에 넣지 않아 주소 릴레이 후 즉시 재시도한다.
-        if (hasEffectiveRegion) {
-          await setCachedHospitalSummary(hospitalName, effectiveRegion, null);
+        if (outcome.status === 'rejected') {
+          matchedPlatforms.push(buildFailedSummary(platform, 'error').summary);
+          continue;
         }
-        return { ok: true, summary: null };
+
+        const result = outcome.value;
+        matchedPlatforms.push(result.summary);
+        rawOffers.push(...result.offers);
+
+        if (platform === 'modoodoc' && result.summary.status === 'matched') {
+          modoodocHospitalUrl = result.summary.hospitalUrl;
+          if (result.topTreatments) {
+            topTreatments = result.topTreatments.map((t) => ({ name: t.name, count: t.count }));
+          }
+          if (result.hiraOffers && result.hiraOffers.length > 0) {
+            hiraOffers.push(...result.hiraOffers);
+            for (const hiraOffer of result.hiraOffers) {
+              const existing = hiraBaselines[hiraOffer.treatmentCode];
+              if (existing === undefined || hiraOffer.listedPrice < existing) {
+                hiraBaselines[hiraOffer.treatmentCode] = hiraOffer.listedPrice;
+              }
+            }
+          }
+        }
       }
 
-      await setCachedHospitalSummary(hospitalName, effectiveRegion, parsed.summary);
-      await attachSummaryToRecentHospital(hospitalName, effectiveRegion, parsed.summary);
+      if (hiraOffers.length > 0) {
+        matchedPlatforms.push({
+          platform: 'hira',
+          platformLabel: PLATFORM_LABELS.hira,
+          status: 'matched',
+          hospitalUrl: modoodocHospitalUrl,
+          rating: null,
+          ratingScale: 10,
+          reviewCount: 0,
+          offerCount: hiraOffers.length,
+        });
+        rawOffers.push(...hiraOffers);
+      }
+
+      const hasMatched = matchedPlatforms.some((item) => item.status === 'matched');
+      const hadAnyError = matchedPlatforms.some((item) => item.status === 'error');
+
+      if (!hasMatched) {
+        if (!hadAnyError && hasEffectiveRegion) {
+          await setCachedHospitalComparison(hospitalName, effectiveRegion, null);
+        }
+        return { ok: !hadAnyError, comparison: null };
+      }
+
+      const comparison: HospitalComparisonResult = {
+        hospitalName: cleanName,
+        regionHint: effectiveRegion,
+        department,
+        matchedPlatforms,
+        rawOffers,
+        hiraBaselines,
+        topTreatments,
+        fetchedAt: Date.now(),
+      };
+
+      if (!hadAnyError) {
+        await setCachedHospitalComparison(hospitalName, effectiveRegion, comparison);
+      }
+      await attachComparisonToRecentHospital(hospitalName, effectiveRegion, comparison);
       if (directRegion !== effectiveRegion) {
-        await attachSummaryToRecentHospital(hospitalName, directRegion, parsed.summary);
+        await attachComparisonToRecentHospital(hospitalName, directRegion, comparison);
       }
 
-      return { ok: true, summary: parsed.summary };
+      return { ok: true, comparison };
     } catch {
-      return { ok: false, summary: null };
+      return { ok: false, comparison: null };
     } finally {
-      inFlightSsr.delete(key);
+      inFlightComparison.delete(key);
     }
   })();
 
-  inFlightSsr.set(key, task);
+  inFlightComparison.set(key, task);
   return task;
 }
 
-async function openHospitalTarget(
-  req: OpenModoodocHospitalRequest,
-): Promise<OpenModoodocHospitalResponse> {
+async function openPlatformTarget(
+  req: OpenPlatformTargetRequest,
+): Promise<OpenPlatformTargetResponse> {
   const effectiveRegion = resolveEffectiveRegion(req.hospitalName, req.regionHint);
-  let targetUrl = req.targetUrl ?? null;
-
-  if (!targetUrl) {
-    const resolved = await fetchModoodocSsrSummary(req.hospitalName, effectiveRegion);
-    targetUrl =
-      resolved.summary?.detailUrl ?? buildModoodocSearchUrl(req.hospitalName, effectiveRegion);
-  }
-
-  // 실제 새 탭 생성 성공 후에만 클릭 이력을 기록한다.
-  await browser.tabs.create({ url: targetUrl });
+  await browser.tabs.create({ url: req.targetUrl });
   await markHospitalClicked({
     name: req.hospitalName,
     department: req.department,
     regionHint: effectiveRegion,
   });
 
-  return { ok: true, targetUrl };
+  return { ok: true, targetUrl: req.targetUrl };
 }
 
 export default defineBackground(() => {
@@ -259,10 +617,14 @@ export default defineBackground(() => {
       return false;
     }
 
-    if (isFetchModoodocSummaryRequest(message)) {
-      fetchModoodocSsrSummary(message.hospitalName, message.regionHint)
+    if (isFetchHospitalComparisonRequest(message)) {
+      fetchHospitalMultiPlatformComparison(
+        message.hospitalName,
+        message.regionHint,
+        message.department,
+      )
         .then((response) => sendResponse(response))
-        .catch(() => sendResponse({ ok: false, summary: null }));
+        .catch(() => sendResponse({ ok: false, comparison: null }));
       return true;
     }
 
@@ -284,19 +646,16 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (isOpenModoodocHospitalRequest(message)) {
-      openHospitalTarget(message)
+    if (isOpenPlatformTargetRequest(message)) {
+      openPlatformTarget(message)
         .then((response) => sendResponse(response))
         .catch(async () => {
-          const effectiveRegion = resolveEffectiveRegion(message.hospitalName, message.regionHint);
-          const fallbackUrl =
-            message.targetUrl ?? buildModoodocSearchUrl(message.hospitalName, effectiveRegion);
           try {
-            await browser.tabs.create({ url: fallbackUrl });
+            await browser.tabs.create({ url: message.targetUrl });
           } catch {
             // ignore tab creation fallback failure
           }
-          sendResponse({ ok: false, targetUrl: fallbackUrl });
+          sendResponse({ ok: false, targetUrl: message.targetUrl });
         });
       return true;
     }

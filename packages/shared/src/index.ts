@@ -5,6 +5,7 @@ export {
   type CategoryMatchResult,
   type ClinicCandidateIdentity,
   type ClinicTargetIdentity,
+  type CollectablePlatformSource,
   EXCLUDED_NON_TARGET_KEYWORDS,
   type ExternalPlatformLink,
   evaluateMedicalCategory,
@@ -16,6 +17,7 @@ export {
   normalizeHospitalName,
   type ParsedRegion,
   parseAddressTokens,
+  resolveTargetPlatformsForDepartment,
   SIDO_MAP,
   scoreClinicResolution,
   scoreNameMatch,
@@ -23,6 +25,8 @@ export {
   TARGET_MEDICAL_KEYWORDS,
 } from './hospitalMatcher';
 export {
+  type HospitalComparisonResult,
+  HospitalComparisonResultSchema,
   type NormalizedPriceOffer,
   NormalizedPriceOfferSchema,
   type OfferBadge,
@@ -30,12 +34,18 @@ export {
   PLATFORM_LABELS,
   type PlatformSource,
   PlatformSourceSchema,
+  type PlatformSummaryItem,
+  PlatformSummaryItemSchema,
+  type PlatformSummaryStatus,
+  PlatformSummaryStatusSchema,
   type RawPlatformOffer,
   RawPlatformOfferSchema,
   type StandardTreatment,
   StandardTreatmentSchema,
   type TreatmentCategory,
   TreatmentCategorySchema,
+  type TreatmentTagItem,
+  TreatmentTagItemSchema,
 } from './schemas';
 export {
   classifyTreatmentName,
